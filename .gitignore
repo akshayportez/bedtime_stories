@@ -1,0 +1,43 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+# Dart
+*.dart_tool
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+# Android
+android/.gradle/
+android/.idea/
+android/local.properties
+android/key.properties
+android/app/key.properties
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+# Linux
+linux/flutter/ephemeral/
+# macOS
+macos/Flutter/ephemeral/
+# Windows
+windows/flutter/ephemeral/
+# Web
+web/.dart_tool/
+web/.pub-cache/
