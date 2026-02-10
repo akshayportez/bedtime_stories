@@ -38,15 +38,17 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       /// Bottom Navigation
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          color: Colors.transparent, //  No white strip
-          child: _BottomNavBar(
-            selectedIndex: selectedIndex,
-            onChanged: (index) {
-              setState(() => selectedIndex = index);
-            },
-          ),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          bottom: 14 + MediaQuery.of(context).padding.bottom,
+        ),
+        child: _BottomNavBar(
+          selectedIndex: selectedIndex,
+          onChanged: (index) {
+            setState(() => selectedIndex = index);
+          },
         ),
       ),
     );
@@ -63,11 +65,6 @@ class _BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 82,
-      margin: const EdgeInsets.only(
-        left: 18,
-        right: 18,
-        bottom: 14, 
-      ),
       padding: EdgeInsets.symmetric(horizontal: 10),
 
       decoration: BoxDecoration(

@@ -10,6 +10,9 @@ class RequestPage extends StatefulWidget {
 class _RequestPageState extends State<RequestPage> {
   final TextEditingController _searchController = TextEditingController();
   int _projectId = 0;
+  String _statusFilter = "";
+  String _dFrom = "";
+  String _dTo = "";
 
   @override
   void initState() {
@@ -35,9 +38,9 @@ class _RequestPageState extends State<RequestPage> {
             projectId: projectId,
             userActionId: 0,
             search: "",
-            statusFilter: "",
-            dFrom: "",
-            dTo: "",
+            statusFilter: _statusFilter,
+            dFrom: _dFrom,
+            dTo: _dTo,
           ),
         );
   }
@@ -66,9 +69,9 @@ class _RequestPageState extends State<RequestPage> {
             projectId: _projectId,
             userActionId: 0,
             search: value.trim(),
-            statusFilter: "",
-            dFrom: "",
-            dTo: "",
+            statusFilter: _statusFilter,
+            dFrom: _dFrom,
+            dTo: _dTo,
           ),
         );
   }
@@ -92,6 +95,40 @@ class _RequestPageState extends State<RequestPage> {
 
   String _formatAmount(double amount) {
     return amount.toStringAsFixed(2);
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final d = date.day.toString().padLeft(2, "0");
+    return "$y-$m-$d";
+  }
+
+  Future<void> _openFilterSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _RequestFilterBottomSheet(
+          initialStatus: _statusFilter,
+          initialDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
+          onApply: (selectedDate, status) async {
+            _statusFilter = status;
+            if (selectedDate == null) {
+              _dFrom = "";
+              _dTo = "";
+            } else {
+              final formatted = _formatDate(selectedDate);
+              _dFrom = formatted;
+              _dTo = formatted;
+            }
+            if (mounted) setState(() {});
+            await _loadRequests();
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -138,12 +175,16 @@ class _RequestPageState extends State<RequestPage> {
                     border: Border.all(color: Colors.black),
                     borderRadius: BorderRadius.circular(50),
                   ),
-                  child: Center(
-                    child: Image.asset(
-                      "assets/icons/filter.png",
-                      width: 18,
-                      height: 18,
-                      fit: BoxFit.contain,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(50),
+                    onTap: _openFilterSheet,
+                    child: Center(
+                      child: Image.asset(
+                        "assets/icons/filter.png",
+                        width: 18,
+                        height: 18,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
@@ -170,8 +211,12 @@ class _RequestPageState extends State<RequestPage> {
                       return const Center(child: Text("No requests found"));
                     }
 
+                    final bottomInset =
+                        MediaQuery.of(context).padding.bottom;
                     return ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.only(
+                        bottom: 16 + bottomInset + 96,
+                      ),
                       itemCount: state.requests.length,
                       itemBuilder: (context, index) {
                         final request = state.requests[index];
@@ -193,7 +238,6 @@ class _RequestPageState extends State<RequestPage> {
                 },
               ),
             ),
-            SizedBox(height: 140),
           ],
         ),
       ),
@@ -451,6 +495,215 @@ class _BottomSheetProjectTile extends StatelessWidget {
             fontWeight: FontWeight.w400,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RequestFilterBottomSheet extends StatefulWidget {
+  final String initialStatus;
+  final DateTime? initialDate;
+  final void Function(DateTime? selectedDate, String status) onApply;
+
+  const _RequestFilterBottomSheet({
+    required this.initialStatus,
+    required this.initialDate,
+    required this.onApply,
+  });
+
+  @override
+  State<_RequestFilterBottomSheet> createState() =>
+      _RequestFilterBottomSheetState();
+}
+
+class _RequestFilterBottomSheetState extends State<_RequestFilterBottomSheet> {
+  DateTime? _selectedDate;
+  String _selectedStatus = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _selectedStatus = widget.initialStatus;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return FractionallySizedBox(
+      heightFactor: 0.82,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 12,
+          bottom: 16 + bottomPadding,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Text(
+                    "Filter",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEAEAEA)),
+                        ),
+                        child: CalendarDatePicker(
+                          initialDate: _selectedDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          onDateChanged: (date) {
+                            setState(() => _selectedDate = date);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 6),
+                      _FilterRadioRow(
+                        label: "All",
+                        value: "",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Requested",
+                        value: "Requested",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Approved",
+                        value: "Approved",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Rejected",
+                        value: "Rejected",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Paid",
+                        value: "Paid",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 80,
+                  height: 36,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B84F3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: () {
+                      widget.onApply(_selectedDate, _selectedStatus);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterRadioRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final String groupValue;
+  final ValueChanged<String> onChanged;
+
+  const _FilterRadioRow({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(value),
+      child: Row(
+        children: [
+          Radio<String>(
+            value: value,
+            groupValue: groupValue,
+            onChanged: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Colors.black),
+          ),
+        ],
       ),
     );
   }
