@@ -1,17 +1,104 @@
 part of 'package:bedtime_stories/utils/lib_files.dart';
 
-class RequestPage extends StatelessWidget {
+class RequestPage extends StatefulWidget {
   const RequestPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final TextEditingController searchController = TextEditingController();
+  State<RequestPage> createState() => _RequestPageState();
+}
 
+class _RequestPageState extends State<RequestPage> {
+  final TextEditingController _searchController = TextEditingController();
+  int _projectId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRequests() async {
+    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+    _projectId = projectId;
+
+    if (!mounted) return;
+
+    context.read<BedtimePaymentRequestBloc>().add(
+          BedtimePaymentRequestLoadRequested(
+            companyId: 1,
+            projectId: projectId,
+            userActionId: 0,
+            search: "",
+            statusFilter: "",
+            dFrom: "",
+            dTo: "",
+          ),
+        );
+  }
+
+  Future<void> _openProjectSelectionSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _ProjectSelectionBottomSheet(
+          onProjectSelected: () async {
+            if (!mounted) return;
+            setState(() {});
+            await _loadRequests();
+          },
+        );
+      },
+    );
+  }
+
+  void _onSearchChanged(String value) {
+    context.read<BedtimePaymentRequestBloc>().add(
+          BedtimePaymentRequestSearchRequested(
+            companyId: 1,
+            projectId: _projectId,
+            userActionId: 0,
+            search: value.trim(),
+            statusFilter: "",
+            dFrom: "",
+            dTo: "",
+          ),
+        );
+  }
+
+  Color _statusColor(String status) {
+    final normalized = status.trim().toLowerCase();
+    if (normalized == "requested" || normalized == "reqested") {
+      return const Color(0xFFF6B504);
+    }
+    if (normalized == "paid") {
+      return const Color(0xFF07CE07);
+    }
+    if (normalized == "approved") {
+      return const Color(0xFF0792CE);
+    }
+    if (normalized == "rejected") {
+      return const Color(0xFFFB5F38);
+    }
+    return const Color(0xFF7F7F7F);
+  }
+
+  String _formatAmount(double amount) {
+    return amount.toStringAsFixed(2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: BedtimeGradientAppBar(
-        onProjectTap: () {
-          Navigator.pushNamed(context, "/projectSelection");
-        },
+        onProjectTap: _openProjectSelectionSheet,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -36,7 +123,10 @@ class RequestPage extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _RequestSearchBar(controller: searchController),
+                  child: _RequestSearchBar(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                  ),
                 ),
                 const SizedBox(width: 10),
 
@@ -64,52 +154,46 @@ class RequestPage extends StatelessWidget {
 
             /// Request Cards List
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 16),
-                children: const [
-                  _RequestCard(
-                    reqNo: "SOD458",
-                    dateTime: "Mar 10 , 2025  12 : 20 am",
-                    name: "Mammootty",
-                    category: "Actor",
-                    section: "Travel",
-                    amount: "4500.00",
-                    status: "Requested",
-                    statusColor: Color(0xFFF6B504),
-                  ),
-                  _RequestCard(
-                    reqNo: "SOD457",
-                    dateTime: "Mar 10 , 2025  12 : 20 am",
-                    name: "Mohanlal",
-                    category: "Actor",
-                    section: "Travel",
-                    amount: "5785.00",
-                    status: "Approved",
-                    statusColor: Color(0xFF0792CE),
-                  ),
-                  _RequestCard(
-                    reqNo: "SOD456",
-                    dateTime: "Mar 10 , 2025  12 : 20 am",
-                    name: "Mohanlal",
-                    category: "Actor",
-                    section: "Food",
-                    amount: "258.00",
-                    status: "Paid",
-                    statusColor: Color(0xFF07CE07),
-                  ),
-                  _RequestCard(
-                    reqNo: "SOD455",
-                    dateTime: "Mar 10 , 2025  12 : 20 am",
-                    name: "Mohanlal",
-                    category: "Actor",
-                    section: "Food",
-                    amount: "987.00",
-                    status: "Rejected",
-                    statusColor: Color(0xFFFB5F38),
-                  ),
-                ],
+              child: BlocBuilder<BedtimePaymentRequestBloc,
+                  BedtimePaymentRequestState>(
+                builder: (context, state) {
+                  if (state is BedtimePaymentRequestLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (state is BedtimePaymentRequestFailure) {
+                    return Center(child: Text(state.message));
+                  }
+
+                  if (state is BedtimePaymentRequestLoaded) {
+                    if (state.requests.isEmpty) {
+                      return const Center(child: Text("No requests found"));
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      itemCount: state.requests.length,
+                      itemBuilder: (context, index) {
+                        final request = state.requests[index];
+                        return _RequestCard(
+                          reqNo: request.cRequestNo,
+                          dateTime: request.cRequestDateTime ?? "",
+                          name: request.cAccountName,
+                          category: request.cCategoryName,
+                          section: request.cSectionName,
+                          amount: _formatAmount(request.nPayableAmount),
+                          status: request.cStatus,
+                          statusColor: _statusColor(request.cStatus),
+                        );
+                      },
+                    );
+                  }
+
+                  return const SizedBox();
+                },
               ),
             ),
+            SizedBox(height: 140),
           ],
         ),
       ),
@@ -119,8 +203,12 @@ class RequestPage extends StatelessWidget {
 
 class _RequestSearchBar extends StatelessWidget {
   final TextEditingController controller;
+  final ValueChanged<String> onChanged;
 
-  const _RequestSearchBar({required this.controller});
+  const _RequestSearchBar({
+    required this.controller,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +216,7 @@ class _RequestSearchBar extends StatelessWidget {
       height: 46,
       child: TextField(
         controller: controller,
+        onChanged: onChanged,
         decoration: InputDecoration(
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
           hintText: "Search",
@@ -148,6 +237,218 @@ class _RequestSearchBar extends StatelessWidget {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(50),
             borderSide: const BorderSide(color: Color(0xFF8FBFDE), width: 1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectSelectionBottomSheet extends StatefulWidget {
+  final Future<void> Function() onProjectSelected;
+
+  const _ProjectSelectionBottomSheet({
+    required this.onProjectSelected,
+  });
+
+  @override
+  State<_ProjectSelectionBottomSheet> createState() =>
+      _ProjectSelectionBottomSheetState();
+}
+
+class _ProjectSelectionBottomSheetState
+    extends State<_ProjectSelectionBottomSheet> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<BedtimeProjectBloc>().add(
+          BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+        );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    context.read<BedtimeProjectBloc>().add(
+          BedtimeProjectSearchRequested(
+            companyId: 1,
+            userId: 1,
+            search: value.trim(),
+          ),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return FractionallySizedBox(
+      heightFactor: 0.78,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 14,
+          bottom: 18 + bottomPadding,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Text(
+                    "Select Project",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: appPrimaryColor,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "Please choose a project to continue",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF2D2D2D),
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 42,
+                child: TextFormField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: SvgPicture.asset(
+                        "assets/icons/search_icon.svg",
+                        width: 14,
+                        height: 14,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    hintText: "Search",
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF7F7F7F),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w300,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFC8DFEE), width: 1),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFC8DFEE), width: 1),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: BlocBuilder<BedtimeProjectBloc, BedtimeProjectState>(
+                  builder: (context, state) {
+                    if (state is BedtimeProjectLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (state is BedtimeProjectFailure) {
+                      return Center(child: Text(state.message));
+                    }
+
+                    if (state is BedtimeProjectLoaded) {
+                      if (state.projects.isEmpty) {
+                        return const Center(child: Text("No projects found"));
+                      }
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: state.projects.length,
+                        itemBuilder: (context, index) {
+                          final project = state.projects[index];
+                          return _BottomSheetProjectTile(
+                            title: project.cProjectName,
+                            onTap: () async {
+                              await BedtimeLocalStorage.saveSelectedProject(
+                                projectId: project.nProjectId,
+                                projectName: project.cProjectName,
+                              );
+                              await widget.onProjectSelected();
+                              if (mounted) Navigator.pop(context);
+                            },
+                          );
+                        },
+                      );
+                    }
+
+                    return const SizedBox();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomSheetProjectTile extends StatelessWidget {
+  final String title;
+  final VoidCallback onTap;
+
+  const _BottomSheetProjectTile({
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xE8ECF1FB),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFB7CBEF)),
+        ),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Colors.black,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ),
@@ -189,7 +490,7 @@ class _RequestCard extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -218,7 +519,7 @@ class _RequestCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Container(height: 2, color: const Color(0xFFF3F7FC)),
                 const SizedBox(height: 6),
-            
+
                 /// Name Row with Avatar
                 Row(
                   children: [
@@ -244,9 +545,9 @@ class _RequestCard extends StatelessWidget {
                     ),
                   ],
                 ),
-            
+
                 const SizedBox(height: 8),
-            
+
                 /// Category + Section
                 Row(
                   children: [
@@ -289,14 +590,13 @@ class _RequestCard extends StatelessWidget {
                     ),
                   ],
                 ),
-            
+
                 // const SizedBox(height: 10),
-            
-              
               ],
             ),
           ),
-            /// Bottom Strip Row
+
+          /// Bottom Strip Row
           Container(
             height: 39,
             padding: const EdgeInsets.symmetric(horizontal: 10),
