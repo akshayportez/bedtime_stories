@@ -13,6 +13,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   bool isTdsChecked = true;
   bool isTaxableChecked = true;
+  int? _selectedAccountId;
+  int? _selectedCategoryId;
+  int? _selectedSectionId;
 
   final List<String> taxOptions = ["CGST", "SGST", "GST", "IGST"];
   final Map<String, String> taxRates = {
@@ -47,6 +50,20 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    context.read<BedtimeGetAccountsListBloc>().add(
+      BedtimeGetAccountsListLoadRequested(companyId: 1),
+    );
+    context.read<BedtimeGetCategoryListBloc>().add(
+      BedtimeGetCategoryListLoadRequested(companyId: 1),
+    );
+    context.read<BedtimeGetSectionListBloc>().add(
+      BedtimeGetSectionListLoadRequested(companyId: 1),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -75,11 +92,11 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// Dropdown Fields
-            _dropdownField("Account", suffixText: "+ Add New Account"),
+            _accountDropdownField(),
             const SizedBox(height: 12),
-            _dropdownField("Category"),
+            _categoryDropdownField(),
             const SizedBox(height: 12),
-            _dropdownField("Section"),
+            _sectionDropdownField(),
 
             const SizedBox(height: 16),
 
@@ -377,6 +394,307 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         payable: "₹0.00",
         onSave: () {},
       ),
+    );
+  }
+
+  /// Dropdown Style Field
+  Widget _accountDropdownField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Text("Account", style: TextStyle(fontSize: 13)),
+            Spacer(),
+            Text(
+              "+ Add New Account",
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF2E7CF6),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCCDDEB)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child:
+              BlocBuilder<BedtimeGetAccountsListBloc, BedtimeGetAccountsListState>(
+            builder: (context, state) {
+              if (state is BedtimeGetAccountsListLoading) {
+                return const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+
+              if (state is BedtimeGetAccountsListFailure) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        state.message,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        context.read<BedtimeGetAccountsListBloc>().add(
+                          BedtimeGetAccountsListLoadRequested(companyId: 1),
+                        );
+                      },
+                      child: const Icon(Icons.refresh, size: 18),
+                    ),
+                  ],
+                );
+              }
+
+              if (state is BedtimeGetAccountsListLoaded) {
+                return DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: state.accounts.any(
+                      (account) => account.nAccountId == _selectedAccountId,
+                    )
+                        ? _selectedAccountId
+                        : null,
+                    hint: const Text(
+                      "Select Account",
+                      style: TextStyle(fontSize: 13, color: Color(0xFF7F7F7F)),
+                    ),
+                    icon: const Icon(Icons.chevron_right, size: 16),
+                    items: state.accounts
+                        .map(
+                          (account) => DropdownMenuItem<int>(
+                            value: account.nAccountId,
+                            child: Text(
+                              account.cAccountName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedAccountId = value);
+                    },
+                  ),
+                );
+              }
+
+              return const SizedBox();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Dropdown Style Field
+  Widget _categoryDropdownField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Category", style: TextStyle(fontSize: 13)),
+        const SizedBox(height: 6),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCCDDEB)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: BlocBuilder<BedtimeGetCategoryListBloc, BedtimeGetCategoryListState>(
+            builder: (context, state) {
+              if (state is BedtimeGetCategoryListLoading) {
+                return const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+
+              if (state is BedtimeGetCategoryListFailure) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        state.message,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        context.read<BedtimeGetCategoryListBloc>().add(
+                          BedtimeGetCategoryListLoadRequested(companyId: 1),
+                        );
+                      },
+                      child: const Icon(Icons.refresh, size: 18),
+                    ),
+                  ],
+                );
+              }
+
+              if (state is BedtimeGetCategoryListLoaded) {
+                return DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: state.categories.any(
+                      (category) => category.nCategoryId == _selectedCategoryId,
+                    )
+                        ? _selectedCategoryId
+                        : null,
+                    hint: const Text(
+                      "Select Category",
+                      style: TextStyle(fontSize: 13, color: Color(0xFF7F7F7F)),
+                    ),
+                    icon: const Icon(Icons.chevron_right, size: 16),
+                    items: state.categories
+                        .map(
+                          (category) => DropdownMenuItem<int>(
+                            value: category.nCategoryId,
+                            child: Text(
+                              category.cCategoryName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedCategoryId = value);
+                    },
+                  ),
+                );
+              }
+
+              return const SizedBox();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Dropdown Style Field
+  Widget _sectionDropdownField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Section", style: TextStyle(fontSize: 13)),
+        const SizedBox(height: 6),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCCDDEB)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: BlocBuilder<BedtimeGetSectionListBloc, BedtimeGetSectionListState>(
+            builder: (context, state) {
+              if (state is BedtimeGetSectionListLoading) {
+                return const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+
+              if (state is BedtimeGetSectionListFailure) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        state.message,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        context.read<BedtimeGetSectionListBloc>().add(
+                          BedtimeGetSectionListLoadRequested(companyId: 1),
+                        );
+                      },
+                      child: const Icon(Icons.refresh, size: 18),
+                    ),
+                  ],
+                );
+              }
+
+              if (state is BedtimeGetSectionListLoaded) {
+                return DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: state.sections.any(
+                      (section) => section.nSectionId == _selectedSectionId,
+                    )
+                        ? _selectedSectionId
+                        : null,
+                    hint: const Text(
+                      "Select Section",
+                      style: TextStyle(fontSize: 13, color: Color(0xFF7F7F7F)),
+                    ),
+                    icon: const Icon(Icons.chevron_right, size: 16),
+                    items: state.sections
+                        .map(
+                          (section) => DropdownMenuItem<int>(
+                            value: section.nSectionId,
+                            child: Text(
+                              section.cSectionName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedSectionId = value);
+                    },
+                  ),
+                );
+              }
+
+              return const SizedBox();
+            },
+          ),
+        ),
+      ],
     );
   }
 

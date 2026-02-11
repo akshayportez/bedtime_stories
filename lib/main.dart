@@ -1,3 +1,12 @@
+import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_category_list_bloc/bedtime_get_category_list_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_category_list_bloc/bedtime_get_category_list_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_category_list_bloc/bedtime_get_category_list_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_repository.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/project_selection_bloc/bedtime_project_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/project_selection_bloc/bedtime_project_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/project_selection_bloc/bedtime_project_repository.dart';
@@ -32,6 +41,27 @@ Future<void> main() async {
       ),
     ),
     BlocProvider(
+      create: (_) => BedtimeGetAccountsListBloc(
+        BedtimeGetAccountsListRepository(
+          BedtimeGetAccountsListApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimeGetCategoryListBloc(
+        BedtimeGetCategoryListRepository(
+          BedtimeGetCategoryListApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimeGetSectionListBloc(
+        BedtimeGetSectionListRepository(
+          BedtimeGetSectionListApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
       create: (_) => BedtimePaymentRequestBloc(
         BedtimePaymentRequestRepository(
           BedtimePaymentRequestApiProvider(),
@@ -50,3 +80,4 @@ Future<void> main() async {
   )
 );
 }
+
