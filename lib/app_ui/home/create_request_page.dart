@@ -307,7 +307,12 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             color: Colors.black,
           ),
         ),
-        leading: const Icon(Icons.arrow_back_ios, size: 18,color: Colors.black,),
+        leading: InkWell(
+          onTap: () {
+            Navigator.pop(context);
+          },
+          child: const Icon(Icons.arrow_back_ios, size: 18,color: Colors.black,),
+        ),
        
       ),
 
@@ -692,14 +697,17 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: const [
-            Text("Account", style: TextStyle(fontSize: 13)),
-            Spacer(),
-            Text(
-              "+ Add New Account",
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF2E7CF6),
+          children: [
+            const Text("Account", style: TextStyle(fontSize: 13)),
+            const Spacer(),
+            GestureDetector(
+              onTap: _openAddNewAccountSheet,
+              child: const Text(
+                "+ Add New Account",
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF2E7CF6),
+                ),
               ),
             ),
           ],
@@ -802,6 +810,31 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _openAddNewAccountSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return AddNewAccoutnSheet(
+          taxOptions: taxOptions,
+          taxRates: taxRates,
+          taxIdByName: _taxIdByName,
+          onAccountCreated: _onAccountCreated,
+        );
+      },
+    );
+  }
+
+  void _onAccountCreated(int accountId) {
+    setState(() {
+      _selectedAccountId = accountId;
+    });
+    context.read<BedtimeGetAccountsListBloc>().add(
+          BedtimeGetAccountsListLoadRequested(companyId: 1),
+        );
   }
 
   /// Dropdown Style Field
@@ -1580,6 +1613,663 @@ class _DashedRoundedBorderPainter extends CustomPainter {
         oldDelegate.strokeWidth != strokeWidth ||
         oldDelegate.dashWidth != dashWidth ||
         oldDelegate.dashGap != dashGap;
+  }
+}
+
+class AddNewAccoutnSheet extends StatefulWidget {
+  final List<String> taxOptions;
+  final Map<String, String> taxRates;
+  final Map<String, int> taxIdByName;
+  final ValueChanged<int> onAccountCreated;
+
+  const AddNewAccoutnSheet({
+    super.key,
+    required this.taxOptions,
+    required this.taxRates,
+    required this.taxIdByName,
+    required this.onAccountCreated,
+  });
+
+  @override
+  State<AddNewAccoutnSheet> createState() => _AddNewAccoutnSheetState();
+}
+
+class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
+  static const double _taxHeaderHeight = 30;
+  static const double _taxRowHeight = 34;
+
+  final TextEditingController _accountNameController = TextEditingController();
+  final TextEditingController _shortNameController = TextEditingController();
+  final TextEditingController _panController = TextEditingController();
+  final TextEditingController _gstController = TextEditingController();
+  final TextEditingController _tdsRateController = TextEditingController();
+
+  bool _isTdsChecked = false;
+  bool _isTaxableChecked = false;
+  bool _isSaving = false;
+  late List<Map<String, String>> _taxList;
+  final List<TextEditingController> _taxRateControllers = [];
+
+  String get _defaultTaxName =>
+      widget.taxOptions.isNotEmpty ? widget.taxOptions.first : "";
+
+  String _defaultTaxRate() => widget.taxRates[_defaultTaxName] ?? "";
+
+  @override
+  void initState() {
+    super.initState();
+    _taxList = [
+      {"name": _defaultTaxName, "rate": _defaultTaxRate()},
+    ];
+    _taxRateControllers.add(
+      TextEditingController(text: _defaultTaxRate()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _accountNameController.dispose();
+    _shortNameController.dispose();
+    _panController.dispose();
+    _gstController.dispose();
+    _tdsRateController.dispose();
+    for (final controller in _taxRateControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onTaxNameChanged(int index, String? selectedTax) {
+    if (selectedTax == null) return;
+    setState(() {
+      _taxList[index]["name"] = selectedTax;
+      _taxList[index]["rate"] = widget.taxRates[selectedTax] ?? "";
+      _taxRateControllers[index].text = _taxList[index]["rate"] ?? "";
+    });
+  }
+
+  void _onTaxRateChanged(int index, String value) {
+    setState(() {
+      _taxList[index]["rate"] = value;
+    });
+  }
+
+  void _addTaxRow() {
+    setState(() {
+      final defaultTax = _defaultTaxName;
+      _taxList.add(
+        {
+          "name": defaultTax,
+          "rate": widget.taxRates[defaultTax] ?? "",
+        },
+      );
+      _taxRateControllers.add(
+        TextEditingController(text: widget.taxRates[defaultTax] ?? ""),
+      );
+    });
+  }
+
+  void _removeTaxRow(int index) {
+    setState(() {
+      _taxRateControllers[index].dispose();
+      _taxRateControllers.removeAt(index);
+      _taxList.removeAt(index);
+    });
+  }
+
+  double _parseNumber(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(sanitized) ?? 0;
+  }
+
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
+  List<Map<String, dynamic>> _buildTaxDetails() {
+    if (!_isTaxableChecked) return [];
+
+    return _taxList.map((tax) {
+      final taxName = (tax["name"] ?? "").trim();
+      final taxId = widget.taxIdByName[taxName] ?? 0;
+      final taxRate = _parseNumber(tax["rate"] ?? "");
+      return {
+        "nTaxId": taxId,
+        "cTaxName": taxName,
+        "nTaxRate": taxRate,
+      };
+    }).where((tax) => (tax["nTaxId"] as int) > 0).toList();
+  }
+
+  void _saveAccount() async {
+    if (_isSaving) return;
+
+    final accountName = _accountNameController.text.trim();
+    if (accountName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter account name")),
+      );
+      return;
+    }
+
+    final taxDetails = _buildTaxDetails();
+    if (_isTaxableChecked && taxDetails.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select valid tax details")),
+      );
+      return;
+    }
+
+    final selectedProjectId = await BedtimeLocalStorage.getSelectedProjectId();
+    final userData = await BedtimeLocalStorage.getUserData();
+    final companyId = _resolveInt(userData["companyId"], fallback: 1);
+    final userActionId = _resolveInt(userData["userId"]);
+
+    if (!mounted) return;
+    context.read<BedtimeAddAccountBloc>().add(
+          BedtimeAddAccountSaveRequested(
+            payload: {
+              "nAccountId": 0,
+              "cAccountName": accountName,
+              "cAccountShName": _shortNameController.text.trim(),
+              "cPAN": _panController.text.trim(),
+              "cGST": _gstController.text.trim(),
+              "bTDS": _isTdsChecked,
+              "nTDSPercent":
+                  _isTdsChecked ? _parseNumber(_tdsRateController.text) : 0,
+              "bTaxable": _isTaxableChecked,
+              "nProjectId": selectedProjectId,
+              "nUserActionId": userActionId,
+              "nCompanyId": companyId,
+              "bActive": true,
+              "taxDetails": taxDetails,
+            },
+          ),
+        );
+  }
+
+  Widget _fieldLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        color: Colors.black,
+        fontWeight: FontWeight.w400,
+      ),
+    );
+  }
+
+  Widget _textInput({
+    required TextEditingController controller,
+    double? width,
+    bool enabled = true,
+    String hint = "",
+    String? suffixText,
+    TextInputType keyboardType = TextInputType.text,
+    double fontSize = 13,
+    double hintFontSize = 13,
+    double suffixFontSize = 15,
+  }) {
+    final field = Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFCCDDEB)),
+        borderRadius: BorderRadius.circular(6),
+        color: Colors.white,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled,
+              keyboardType: keyboardType,
+              textAlign: TextAlign.start,
+              textAlignVertical: TextAlignVertical.center,
+              minLines: null,
+              maxLines: null,
+              expands: true,
+              style: TextStyle(fontSize: fontSize),
+              decoration: InputDecoration.collapsed(
+                hintText: hint,
+                hintStyle: TextStyle(
+                  fontSize: hintFontSize,
+                  color: const Color(0xFFB6B6B6),
+                ),
+              ).copyWith(
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+              ),
+            ),
+          ),
+          if (suffixText != null) ...[
+            const SizedBox(width: 4),
+            Text(
+              suffixText,
+              style: TextStyle(
+                fontSize: suffixFontSize,
+                color: const Color(0xFF6F6F6F),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (width == null) return field;
+    return SizedBox(width: width, child: field);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    return BlocListener<BedtimeAddAccountBloc, BedtimeAddAccountState>(
+      listener: (context, state) {
+        if (state is BedtimeAddAccountSaving) {
+          setState(() => _isSaving = true);
+          return;
+        }
+
+        if (state is BedtimeAddAccountSaveFailure) {
+          setState(() => _isSaving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+          return;
+        }
+
+        if (state is BedtimeAddAccountSaveSuccess) {
+          setState(() => _isSaving = false);
+          final bottomInset = MediaQuery.of(context).padding.bottom;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.fromLTRB(14, 0, 14, 120 + bottomInset),
+              content: const Text("Account created successfully"),
+            ),
+          );
+          widget.onAccountCreated(state.response.nAccountId);
+          Navigator.pop(context);
+        }
+      },
+      child: FractionallySizedBox(
+      heightFactor: 0.92,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 12,
+          top: 10,
+          bottom: 12 + keyboardInset,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Center(
+                        child: Text(
+                          "Add Account",
+                          style: TextStyle(
+                            fontSize: 31,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: const Icon(Icons.close, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _fieldLabel("Account Name"),
+                  const SizedBox(height: 4),
+                  _textInput(controller: _accountNameController),
+                  const SizedBox(height: 8),
+                  _fieldLabel("Short Name"),
+                  const SizedBox(height: 4),
+                  _textInput(controller: _shortNameController, width: 86),
+                  const SizedBox(height: 8),
+                  _fieldLabel("PAN Number"),
+                  const SizedBox(height: 4),
+                  _textInput(controller: _panController),
+                  const SizedBox(height: 8),
+                  _fieldLabel("GST Number"),
+                  const SizedBox(height: 4),
+                  _textInput(controller: _gstController),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _isTdsChecked = !_isTdsChecked);
+                        },
+                        child: _CreateRequestBlueCheckBox(
+                          isChecked: _isTdsChecked,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text("TDS", style: TextStyle(fontSize: 13)),
+                      const SizedBox(width: 10),
+                      _textInput(
+                        controller: _tdsRateController,
+                        width: 92,
+                        enabled: _isTdsChecked,
+                        hint: "0",
+                        suffixText: "%",
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        fontSize: 15,
+                        hintFontSize: 14,
+                        suffixFontSize: 15,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isTaxableChecked = !_isTaxableChecked;
+                        if (_isTaxableChecked && _taxList.isEmpty) {
+                          final defaultTax = _defaultTaxName;
+                          _taxList = [
+                            {
+                              "name": defaultTax,
+                              "rate": widget.taxRates[defaultTax] ?? "",
+                            },
+                          ];
+                          _taxRateControllers.add(
+                            TextEditingController(
+                              text: widget.taxRates[defaultTax] ?? "",
+                            ),
+                          );
+                        }
+                      });
+                    },
+                    child: Row(
+                      children: [
+                        _CreateRequestBlueCheckBox(isChecked: _isTaxableChecked),
+                        const SizedBox(width: 6),
+                        const Text("Taxable", style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  if (_isTaxableChecked) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFF98D5F9)),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  height: _taxHeaderHeight,
+                                  color: const Color(0xFFBBE3FA),
+                                  child: Row(
+                                    children: const [
+                                      Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          child: Text(
+                                            "Tax Name",
+                                            style: TextStyle(fontSize: 13),
+                                          ),
+                                        ),
+                                      ),
+                                      VerticalDivider(
+                                        width: 1,
+                                        thickness: 1,
+                                        color: Color(0xFF98D5F9),
+                                      ),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          child: Text(
+                                            "Tax Rate %",
+                                            style: TextStyle(fontSize: 13),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ..._taxList.asMap().entries.map((entry) {
+                                  final int index = entry.key;
+                                  final Map<String, String> tax = entry.value;
+                                  return Container(
+                                    height: _taxRowHeight,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        top: BorderSide(
+                                          color: Color(0xFF98D5F9),
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: DropdownButtonHideUnderline(
+                                              child: DropdownButton<String>(
+                                                value: (tax["name"] ?? "")
+                                                            .isNotEmpty &&
+                                                        widget.taxOptions.contains(
+                                                          tax["name"] ?? "",
+                                                        )
+                                                    ? tax["name"]
+                                                    : null,
+                                                isExpanded: true,
+                                                hint: const Text(
+                                                  "Select Tax",
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Color(0xFF7F7F7F),
+                                                  ),
+                                                ),
+                                                icon: const Icon(
+                                                  Icons.chevron_right,
+                                                  size: 16,
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.black,
+                                                ),
+                                                items: widget.taxOptions
+                                                    .map(
+                                                      (taxName) =>
+                                                          DropdownMenuItem(
+                                                        value: taxName,
+                                                        child: Text(taxName),
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                                onChanged: (val) =>
+                                                    _onTaxNameChanged(index, val),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const VerticalDivider(
+                                          width: 1,
+                                          thickness: 1,
+                                          color: Color(0xFF98D5F9),
+                                        ),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: TextField(
+                                              controller:
+                                                  _taxRateControllers[index],
+                                              keyboardType:
+                                                  const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
+                                              onChanged: (value) =>
+                                                  _onTaxRateChanged(index, value),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                              decoration: const InputDecoration(
+                                                isDense: true,
+                                                hintText: "0",
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                disabledBorder:
+                                                    InputBorder.none,
+                                                errorBorder: InputBorder.none,
+                                                focusedErrorBorder:
+                                                    InputBorder.none,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Column(
+                          children: [
+                            const SizedBox(height: _taxHeaderHeight + 1),
+                            ..._taxList.asMap().entries.map((entry) {
+                              return SizedBox(
+                                height: _taxRowHeight,
+                                child: Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      if (_taxList.length <= 1) return;
+                                      _removeTaxRow(entry.key);
+                                    },
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF4040),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  if (entry.key == _taxList.length - 1)
+                                    GestureDetector(
+                                      onTap: _addTaxRow,
+                                      child: Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.black,
+                                          ),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: const Icon(Icons.add, size: 14),
+                                      ),
+                                    )
+                                  else
+                                    const SizedBox(width: 22),
+                                ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: 72,
+                      height: 36,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A8DEB),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        onPressed: _isSaving ? null : _saveAccount,
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                "Save",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
 }
 
