@@ -561,7 +561,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
                   ),
                 ),
                 onPressed: onSave,
-                child: const Text("Save"),
+                child: const Text("Save", style: TextStyle(fontSize: 16,color: Colors.white)),
               ),
             ),
           ),
@@ -592,8 +592,8 @@ class _CreateRequestSummaryRow extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: isBold ? 13 : 12,
-              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+              fontSize: isBold ? 16 : 12,
+              fontWeight: isBold ? FontWeight.w500 : FontWeight.w500,
               color: labelColor ?? Colors.black,
             ),
           ),
@@ -601,8 +601,8 @@ class _CreateRequestSummaryRow extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 13 : 12,
-            fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+            fontSize: isBold ? 16 : 12,
+            fontWeight: isBold ? FontWeight.w500 : FontWeight.w500,
           ),
         ),
       ],
