@@ -474,7 +474,6 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                           ...taxList.asMap().entries.map((entry) {
                             final int index = entry.key;
                             final Map<String, String> tax = entry.value;
-
                             return Container(
                               height: _taxRowHeight,
                               decoration: const BoxDecoration(

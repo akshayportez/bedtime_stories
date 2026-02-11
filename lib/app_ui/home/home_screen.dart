@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: selectedIndex,
         children: const [
           RequestPage(),
-          Center(child: Text("Approval Page")),
+          ApprovalPage(),
           Center(child: Text("Voucher Page")),
           Center(child: Text("Reports Page")),
         ],
