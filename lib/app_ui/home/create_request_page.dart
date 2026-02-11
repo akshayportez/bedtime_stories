@@ -19,13 +19,16 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   final TextEditingController _requestedAmountController =
       TextEditingController();
   final TextEditingController _tdsRateController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   int _selectedProjectId = 0;
   int _uploadCounter = 0;
+  bool _isSaving = false;
   final List<_CreateRequestUploadItem> _uploadItems = [];
 
   final List<String> taxOptions = [];
   final Map<String, String> taxRates = {};
+  final Map<String, int> _taxIdByName = {};
   List<Map<String, String>> taxList = [
     {"name": "", "rate": ""},
   ];
@@ -41,6 +44,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     for (final tax in taxes) {
       if (tax.cTaxName.isNotEmpty && !taxOptions.contains(tax.cTaxName)) {
         taxOptions.add(tax.cTaxName);
+      }
+      if (tax.cTaxName.isNotEmpty) {
+        _taxIdByName[tax.cTaxName] = tax.nTaxId;
       }
     }
   }
@@ -106,7 +112,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             },
           )
           .toList();
-      for (final tax in taxList) {
+      for (int i = 0; i < taxList.length; i++) {
+        final tax = taxList[i];
+        final detail = account.taxDetails[i];
         final name = tax["name"] ?? "";
         final rate = tax["rate"] ?? "";
         if (name.isNotEmpty && !taxOptions.contains(name)) {
@@ -114,6 +122,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         }
         if (name.isNotEmpty) {
           taxRates[name] = rate;
+          _taxIdByName[name] = detail.nTaxId;
         }
         _taxRateControllers.add(
           TextEditingController(text: rate),
@@ -195,6 +204,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   void dispose() {
     _requestedAmountController.dispose();
     _tdsRateController.dispose();
+    _commentController.dispose();
     for (final controller in _taxRateControllers) {
       controller.dispose();
     }
@@ -231,6 +241,52 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               _markUploadSuccess(state.localId, state.response.cAttachment);
             } else if (state is BedtimePaymentRequestUploadFailure) {
               _markUploadFailed(state.localId, state.message);
+            }
+          },
+        ),
+        BlocListener<BedtimePaymentRequestSaveBloc, BedtimePaymentRequestSaveState>(
+          listener: (context, state) async {
+            if (state is BedtimePaymentRequestSaving) {
+              if (!mounted) return;
+              setState(() => _isSaving = true);
+              return;
+            }
+
+            if (state is BedtimePaymentRequestSaveFailure) {
+              if (!mounted) return;
+              setState(() => _isSaving = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+              return;
+            }
+
+            if (state is BedtimePaymentRequestSaveSuccess) {
+              if (!mounted) return;
+              setState(() => _isSaving = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.response.cMessage.isEmpty
+                        ? "Request saved successfully"
+                        : state.response.cMessage,
+                  ),
+                ),
+              );
+
+              final userData = await BedtimeLocalStorage.getUserData();
+              final companyId = _resolveInt(userData["companyId"], fallback: 1);
+              final userActionId = _resolveInt(userData["userId"]);
+
+              if (!context.mounted) return;
+              context.read<BedtimePaymentRequestBloc>().add(
+                    BedtimePaymentRequestLoadRequested(
+                      companyId: companyId,
+                      projectId: _selectedProjectId,
+                      userActionId: userActionId,
+                    ),
+                  );
+              Navigator.pop(context, true);
             }
           },
         ),
@@ -593,7 +649,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 border: Border.all(color: const Color(0xFFCCDDEB)),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const TextField(
+              child: TextField(
+                controller: _commentController,
                 maxLines: null,
                 decoration: InputDecoration(
                   contentPadding: EdgeInsets.all(10),
@@ -622,6 +679,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           tds: _formatCurrency(_tdsAmount),
           tax: _formatCurrency(_totalTaxAmount),
           payable: _formatCurrency(_payableAmount),
+          isSaving: _isSaving,
           onSave: _onSaveTapped,
         ),
       ),
@@ -938,17 +996,106 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     );
   }
 
-  void _onSaveTapped() {
-    final attachmentValue = _attachmentValueForSave;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          attachmentValue.isEmpty
-              ? "No attachments selected"
-              : "Attachments ready: $attachmentValue",
-        ),
-      ),
-    );
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
+  List<Map<String, dynamic>> _buildTaxDetailsForSave() {
+    if (!isTaxableChecked) return [];
+
+    return taxList.map((tax) {
+      final taxName = (tax["name"] ?? "").trim();
+      final taxId = _taxIdByName[taxName] ?? 0;
+      final taxRate = _parseNumber(tax["rate"] ?? "");
+      return {
+        "nTaxId": taxId,
+        "nTaxRate": taxRate,
+      };
+    }).where((tax) => (tax["nTaxId"] as int) > 0).toList();
+  }
+
+  void _onSaveTapped() async {
+    if (_isSaving) return;
+
+    if (_selectedProjectId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a project")),
+      );
+      return;
+    }
+
+    if (_selectedAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select an account")),
+      );
+      return;
+    }
+
+    if (_selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a category")),
+      );
+      return;
+    }
+
+    if (_selectedSectionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a section")),
+      );
+      return;
+    }
+
+    if (_requestedAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter requested amount")),
+      );
+      return;
+    }
+
+    final hasUploadingItems = _uploadItems.any((item) => item.isUploading);
+    if (hasUploadingItems) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please wait for file upload to finish")),
+      );
+      return;
+    }
+
+    final taxDtl = _buildTaxDetailsForSave();
+    if (isTaxableChecked && taxDtl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select valid tax details")),
+      );
+      return;
+    }
+
+    final userData = await BedtimeLocalStorage.getUserData();
+    final companyId = _resolveInt(userData["companyId"], fallback: 1);
+    final userActionId = _resolveInt(userData["userId"]);
+
+    final payload = <String, dynamic>{
+      "nPayReqId": 0,
+      "nAccountId": _selectedAccountId ?? 0,
+      "nCategoryId": _selectedCategoryId ?? 0,
+      "nSectionId": _selectedSectionId ?? 0,
+      "nRequestedAmount": _requestedAmount,
+      "bTDS": isTdsChecked,
+      "nTDSPercent": isTdsChecked ? _tdsRate : 0,
+      "bTaxable": isTaxableChecked,
+      "taxDtl": taxDtl,
+      "cComment": _commentController.text.trim(),
+      "cAttachment": _attachmentValueForSave,
+      "cStatus": "Requested",
+      "nProjectId": _selectedProjectId,
+      "nCompanyId": companyId,
+      "nUserActionId": userActionId,
+      "bActive": true,
+    };
+
+    if (!mounted) return;
+    context.read<BedtimePaymentRequestSaveBloc>().add(
+          BedtimePaymentRequestSaveRequested(payload: payload),
+        );
   }
 
   Future<void> _pickAndUpload(ImageSource source) async {
@@ -1463,6 +1610,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
   final String tds;
   final String tax;
   final String payable;
+  final bool isSaving;
   final VoidCallback onSave;
 
   const _CreateRequestSummaryBar({
@@ -1470,6 +1618,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
     required this.tds,
     required this.tax,
     required this.payable,
+    required this.isSaving,
     required this.onSave,
   });
 
@@ -1526,8 +1675,22 @@ class _CreateRequestSummaryBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: onSave,
-                child: const Text("Save", style: TextStyle(fontSize: 16,color: Colors.white)),
+                onPressed: isSaving ? null : onSave,
+                child: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Text(
+                        "Save",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
               ),
             ),
           ),
