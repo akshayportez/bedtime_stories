@@ -220,15 +220,35 @@ class _RequestPageState extends State<RequestPage> {
                       itemCount: state.requests.length,
                       itemBuilder: (context, index) {
                         final request = state.requests[index];
-                        return _RequestCard(
-                          reqNo: request.cRequestNo,
-                          dateTime: request.cRequestDateTime ?? "",
-                          name: request.cAccountName,
-                          category: request.cCategoryName,
-                          section: request.cSectionName,
-                          amount: _formatAmount(request.nPayableAmount),
-                          status: request.cStatus,
-                          statusColor: _statusColor(request.cStatus),
+                        return GestureDetector(
+                          onTap: () async {
+                            final deleted = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    RequestDetailPage(request: request),
+                              ),
+                            );
+                            if (deleted == true) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Deleted successfully"),
+                                ),
+                              );
+                              await _loadRequests();
+                            }
+                          },
+                          child: _RequestCard(
+                            reqNo: request.cRequestNo,
+                            dateTime: request.cRequestDateTime ?? "",
+                            name: request.cAccountName,
+                            category: request.cCategoryName,
+                            section: request.cSectionName,
+                            amount: _formatAmount(request.nPayableAmount),
+                            status: request.cStatus,
+                            statusColor: _statusColor(request.cStatus),
+                          ),
                         );
                       },
                     );
@@ -873,12 +893,17 @@ class _RequestCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: Color(0xFF7F7F7F)),
                 ),
 
-                Text(
-                  "\u20B9$amount",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF256DFB),
+                Flexible(
+                  child: Text(
+                    "\u20B9$amount",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF256DFB),
+                    ),
                   ),
                 ),
 

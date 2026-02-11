@@ -33,7 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: appPrimaryColor,
         shape: const CircleBorder(),
-        onPressed: () {},
+        onPressed: () {
+          Navigator.pushNamed(context, "/createRequestPage");
+        },
         child: const Icon(Icons.add, size: 28, color: Colors.white),
       ),
 
@@ -69,7 +71,7 @@ class _BottomNavBar extends StatelessWidget {
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(50), 
+        borderRadius: BorderRadius.circular(50),
         border: Border.all(color: appPrimaryColor, width: 1),
         boxShadow: [
           BoxShadow(
@@ -142,10 +144,7 @@ class _NavItem extends StatelessWidget {
               ? const LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [
-                    Color(0xFF04BBD0),
-                    Color(0xFF79A2F4),
-                  ],
+                  colors: [Color(0xFF04BBD0), Color(0xFF79A2F4)],
                 )
               : null,
           borderRadius: BorderRadius.circular(50),

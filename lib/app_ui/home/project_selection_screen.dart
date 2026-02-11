@@ -10,7 +10,7 @@ class ProjectSelectionScreen extends StatefulWidget {
 class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
   final TextEditingController searchController = TextEditingController();
 
-  final List<String> projects = ["Spy of Darkness", "Kirathukal", "Moon"];
+  final List<String> projects = [];
   @override
   void initState() {
     super.initState();

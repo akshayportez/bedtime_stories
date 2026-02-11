@@ -6,5 +6,6 @@ class Routes {
     '/login': (context) => const LoginScreen(),
     '/projectSelection': (_) => const ProjectSelectionScreen(),
     '/homeScreen': (_) => const HomeScreen(),
+    '/createRequestPage': (_) => const CreateRequestPage(),
   };
 }
