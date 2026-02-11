@@ -10,6 +10,7 @@ class RequestPage extends StatefulWidget {
 class _RequestPageState extends State<RequestPage> {
   final TextEditingController _searchController = TextEditingController();
   int _projectId = 0;
+  int _userActionId = 0;
   String _statusFilter = "";
   String _dFrom = "";
   String _dTo = "";
@@ -28,7 +29,12 @@ class _RequestPageState extends State<RequestPage> {
 
   Future<void> _loadRequests() async {
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userIdValue = userData["userId"];
     _projectId = projectId;
+    _userActionId = userIdValue is int
+        ? userIdValue
+        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
 
     if (!mounted) return;
 
@@ -36,7 +42,7 @@ class _RequestPageState extends State<RequestPage> {
           BedtimePaymentRequestLoadRequested(
             companyId: 1,
             projectId: projectId,
-            userActionId: 0,
+            userActionId: _userActionId,
             search: "",
             statusFilter: _statusFilter,
             dFrom: _dFrom,
@@ -63,11 +69,34 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _onSearchChanged(String value) {
+    if (_userActionId == 0) {
+      BedtimeLocalStorage.getUserData().then((userData) {
+        if (!mounted) return;
+        final userIdValue = userData["userId"];
+        final resolvedUserId = userIdValue is int
+            ? userIdValue
+            : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+        _userActionId = resolvedUserId;
+        context.read<BedtimePaymentRequestBloc>().add(
+              BedtimePaymentRequestSearchRequested(
+                companyId: 1,
+                projectId: _projectId,
+                userActionId: _userActionId,
+                search: value.trim(),
+                statusFilter: _statusFilter,
+                dFrom: _dFrom,
+                dTo: _dTo,
+              ),
+            );
+      });
+      return;
+    }
+
     context.read<BedtimePaymentRequestBloc>().add(
           BedtimePaymentRequestSearchRequested(
             companyId: 1,
             projectId: _projectId,
-            userActionId: 0,
+            userActionId: _userActionId,
             search: value.trim(),
             statusFilter: _statusFilter,
             dFrom: _dFrom,

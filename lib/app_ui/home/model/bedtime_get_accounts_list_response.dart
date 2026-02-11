@@ -23,6 +23,11 @@ class BedtimeGetAccountsListResponse {
   }
 }
 
+double _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? "") ?? 0;
+}
+
 class BedtimeGetAccountsList {
   final int nAccountId;
   final String cAccountName;
@@ -60,7 +65,7 @@ class BedtimeGetAccountsList {
       cPAN: json["cPAN"] ?? "",
       cGST: json["cGST"] ?? "",
       bTDS: json["bTDS"] ?? false,
-      nTDSPercent: (json["nTDSPercent"] ?? 0).toDouble(),
+      nTDSPercent: _asDouble(json["nTDSPercent"]),
       bTaxable: json["bTaxable"] ?? false,
       bActive: json["bActive"] ?? false,
       dCreatedDate: json["dCreatedDate"] ?? "",
@@ -74,14 +79,24 @@ class BedtimeGetAccountsList {
 }
 
 class BedtimeGetAccountsListTaxDetail {
-  final Map<String, dynamic> raw;
+  final int nTaxId;
+  final String cTaxName;
+  final double nTaxRate;
 
-  BedtimeGetAccountsListTaxDetail({required this.raw});
+  BedtimeGetAccountsListTaxDetail({
+    required this.nTaxId,
+    required this.cTaxName,
+    required this.nTaxRate,
+  });
 
   factory BedtimeGetAccountsListTaxDetail.fromJson(
     Map<String, dynamic> json,
   ) {
-    return BedtimeGetAccountsListTaxDetail(raw: json);
+    return BedtimeGetAccountsListTaxDetail(
+      nTaxId: json["nTaxId"] ?? 0,
+      cTaxName: json["cTaxName"] ?? "",
+      nTaxRate: _asDouble(json["nTaxRate"]),
+    );
   }
 }
 
