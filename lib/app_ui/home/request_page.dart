@@ -251,18 +251,22 @@ class _RequestPageState extends State<RequestPage> {
                         final request = state.requests[index];
                         return GestureDetector(
                           onTap: () async {
-                            final deleted = await Navigator.push<bool>(
+                            final action = await Navigator.push<Object?>(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
                                     RequestDetailPage(request: request),
                               ),
                             );
-                            if (deleted == true) {
+                            if (action == "deleted" || action == "updated") {
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Deleted successfully"),
+                                SnackBar(
+                                  content: Text(
+                                    action == "deleted"
+                                        ? "Deleted successfully"
+                                        : "Updated successfully",
+                                  ),
                                 ),
                               );
                               await _loadRequests();

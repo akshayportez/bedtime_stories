@@ -67,3 +67,4 @@ part '../app_ui/home/approval_page.dart';
 part '../app_ui/home/request_detail_page.dart';
 part '../app_ui/home/approval_detail_page.dart';
 part '../app_ui/home/create_request_page.dart';
+part '../app_ui/home/edit_request_page.dart';

@@ -10,7 +10,6 @@ class RequestDetailPage extends StatefulWidget {
 }
 
 class _RequestDetailPageState extends State<RequestDetailPage> {
-  bool _isEditing = false;
   bool _isDeleting = false;
 
   String get _status => widget.request.cStatus.trim();
@@ -136,7 +135,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                       );
                                   if (!mounted) return;
                                   Navigator.pop(context);
-                                  Navigator.pop(context, true);
+                                  Navigator.pop(context, "deleted");
                                 } catch (e) {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -174,6 +173,33 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
     );
   }
 
+  Future<void> _openEditPage({
+    required BedtimePaymentRequestDetail? detail,
+    required List<BedtimePaymentRequestTax> taxes,
+  }) async {
+    if (detail == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please wait, request details are loading")),
+      );
+      return;
+    }
+
+    final isUpdated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditRequestPage(
+          request: widget.request,
+          detail: detail,
+          taxes: taxes,
+        ),
+      ),
+    );
+
+    if (isUpdated == true && mounted) {
+      Navigator.pop(context, "updated");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -187,9 +213,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             _RequestDetailHeader(
               title: "Request",
               onBack: () => Navigator.pop(context),
-              onEdit: _isRequested
-                  ? () => setState(() => _isEditing = !_isEditing)
-                  : null,
+              onEdit: null,
             ),
 
             if (_isApproved || _isPaid)
@@ -381,13 +405,13 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                             payable: _money(payableAmount),
                             showActions: _isRequested || _isRejected,
                             onEdit: _isRequested
-                                ? () => setState(() => _isEditing = !_isEditing)
+                                ? () => _openEditPage(detail: detail, taxes: taxes)
                                 : null,
                             onDelete: _isRequested || _isRejected
                                 ? _showDeleteDialog
                                 : null,
-                            onPrimary: _isEditing ? () {} : null,
-                            primaryLabel: _isEditing ? "Button" : null,
+                            onPrimary: null,
+                            primaryLabel: null,
                             bottomPadding: bottomInset,
                           ),
                         ],

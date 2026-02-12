@@ -1,7 +1,18 @@
 part of 'package:bedtime_stories/utils/lib_files.dart';
 
 class CreateRequestPage extends StatefulWidget {
-  const CreateRequestPage({super.key});
+  final bool isEditMode;
+  final BedtimePaymentRequest? initialRequest;
+  final BedtimePaymentRequestDetail? initialDetail;
+  final List<BedtimePaymentRequestTax> initialTaxes;
+
+  const CreateRequestPage({
+    super.key,
+    this.isEditMode = false,
+    this.initialRequest,
+    this.initialDetail,
+    this.initialTaxes = const [],
+  });
 
   @override
   State<CreateRequestPage> createState() => _CreateRequestPageState();
@@ -22,6 +33,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   final TextEditingController _commentController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   int _selectedProjectId = 0;
+  int _editingPayReqId = 0;
+  String _editingStatus = "Requested";
   int _uploadCounter = 0;
   bool _isSaving = false;
   final List<_CreateRequestUploadItem> _uploadItems = [];
@@ -177,6 +190,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   @override
   void initState() {
     super.initState();
+    _applyInitialDataForEdit();
     _loadSelectedProject();
     context.read<BedtimeGetAccountsListBloc>().add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
@@ -192,7 +206,79 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     );
   }
 
+  void _applyInitialDataForEdit() {
+    if (!widget.isEditMode) return;
+
+    final request = widget.initialRequest;
+    final detail = widget.initialDetail;
+
+    _editingPayReqId = detail?.nPayReqId ?? request?.nPayReqId ?? 0;
+    _editingStatus = (detail?.cStatus ?? request?.cStatus ?? "Requested").trim();
+
+    _selectedAccountId = detail?.nAccountId ?? request?.nAccountId;
+    _selectedCategoryId = detail?.nCategoryId ?? request?.nCategoryId;
+    _selectedSectionId = detail?.nSectionId ?? request?.nSectionId;
+    _selectedProjectId = detail?.nProjectId ?? 0;
+
+    final requestedAmount = detail?.nRequestedAmount ?? request?.nPayableAmount ?? 0;
+    _requestedAmountController.text = requestedAmount > 0
+        ? _formatRate(requestedAmount)
+        : "";
+
+    isTdsChecked = detail?.bTDS ?? false;
+    _tdsRateController.text = _formatRate(detail?.nTDSPercent ?? 0);
+    isTaxableChecked = detail?.bTaxable ?? false;
+    _commentController.text = detail?.cComment ?? "";
+
+    for (final controller in _taxRateControllers) {
+      controller.dispose();
+    }
+    _taxRateControllers.clear();
+    taxList.clear();
+
+    if (isTaxableChecked && widget.initialTaxes.isNotEmpty) {
+      for (final tax in widget.initialTaxes) {
+        final taxName = tax.cTaxName.trim();
+        final taxRate = _formatRate(tax.nTaxRate);
+        if (taxName.isNotEmpty && !taxOptions.contains(taxName)) {
+          taxOptions.add(taxName);
+        }
+        if (taxName.isNotEmpty) {
+          taxRates[taxName] = taxRate;
+          _taxIdByName[taxName] = tax.nTaxId;
+        }
+        taxList.add({"name": taxName, "rate": taxRate});
+        _taxRateControllers.add(TextEditingController(text: taxRate));
+      }
+    } else {
+      taxList.add({"name": "", "rate": ""});
+      _taxRateControllers.add(TextEditingController());
+    }
+
+    final existingAttachments = (detail?.cAttachment ?? "")
+        .split(",")
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty);
+    for (final path in existingAttachments) {
+      final name = path.split(RegExp(r"[\\\\/]")).last;
+      _uploadItems.add(
+        _CreateRequestUploadItem(
+          localId: "existing_${_uploadCounter++}",
+          filePath: "",
+          fileName: name.isEmpty ? path : name,
+          fileSizeBytes: 0,
+          progress: 1,
+          isUploading: false,
+          isUploaded: true,
+          attachmentPath: path,
+          errorMessage: "",
+        ),
+      );
+    }
+  }
+
   Future<void> _loadSelectedProject() async {
+    if (_selectedProjectId > 0) return;
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
     if (!mounted) return;
     setState(() {
@@ -322,6 +408,30 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.isEditMode && widget.initialRequest != null) ...[
+              Row(
+                children: [
+                  Text(
+                    "Req No : ${widget.initialRequest!.cRequestNo}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    widget.initialRequest!.cRequestDateTime ?? "",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF242424),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
             /// Dropdown Fields
             _accountDropdownField(),
             const SizedBox(height: 12),
@@ -699,16 +809,17 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           children: [
             const Text("Account", style: TextStyle(fontSize: 13)),
             const Spacer(),
-            GestureDetector(
-              onTap: _openAddNewAccountSheet,
-              child: const Text(
-                "+ Add New Account",
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF2E7CF6),
+            if (!widget.isEditMode)
+              GestureDetector(
+                onTap: _openAddNewAccountSheet,
+                child: const Text(
+                  "+ Add New Account",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF2E7CF6),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -1106,7 +1217,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     final userActionId = _resolveInt(userData["userId"]);
 
     final payload = <String, dynamic>{
-      "nPayReqId": 0,
+      "nPayReqId": widget.isEditMode ? _editingPayReqId : 0,
       "nAccountId": _selectedAccountId ?? 0,
       "nCategoryId": _selectedCategoryId ?? 0,
       "nSectionId": _selectedSectionId ?? 0,
@@ -1117,7 +1228,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       "taxDtl": taxDtl,
       "cComment": _commentController.text.trim(),
       "cAttachment": _attachmentValueForSave,
-      "cStatus": "Requested",
+      "cStatus": _editingStatus.isEmpty ? "Requested" : _editingStatus,
       "nProjectId": _selectedProjectId,
       "nCompanyId": companyId,
       "nUserActionId": userActionId,
