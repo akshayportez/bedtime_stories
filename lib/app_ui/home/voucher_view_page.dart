@@ -15,6 +15,10 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   @override
   void initState() {
     super.initState();
+    _loadVoucherDetail();
+  }
+
+  void _loadVoucherDetail() {
     context.read<BedtimePaymentVoucherDetailBloc>().add(
       BedtimePaymentVoucherDetailLoadRequested(
         companyId: 1,
@@ -49,6 +53,22 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
       result.add(path);
     }
     return result.toList();
+  }
+
+  Future<void> _openEditPage(BedtimePaymentVoucherDetailResponse detail) async {
+    final didUpdate = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VoucherEditPage(
+          request: widget.request,
+          voucherDetail: detail,
+        ),
+      ),
+    );
+
+    if (didUpdate == true && mounted) {
+      _loadVoucherDetail();
+    }
   }
 
   @override
@@ -249,6 +269,9 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                         bankName: payDtl?.cBankName ?? '',
                         upiRefNo: payDtl?.cUPIRefNo ?? '',
                         upiApp: payDtl?.cUpiApp ?? '',
+                        onEditTap: detail == null
+                            ? null
+                            : () => _openEditPage(detail!),
                         bottomPadding: bottomInset,
                       ),
                     ],
@@ -274,6 +297,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
   final String bankName;
   final String upiRefNo;
   final String upiApp;
+  final VoidCallback? onEditTap;
   final double bottomPadding;
 
   const _VoucherViewSummaryBar({
@@ -287,6 +311,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.bankName,
     required this.upiRefNo,
     required this.upiApp,
+    required this.onEditTap,
     required this.bottomPadding,
   });
 
@@ -395,16 +420,21 @@ class _VoucherViewSummaryBar extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
-            children: const [
-              _VoucherActionIcon(assetPath: 'assets/icons/print_icon.png'),
-              SizedBox(width: 10),
-              _VoucherActionIcon(assetPath: 'assets/icons/watch_icon.png'),
-              SizedBox(width: 10),
-              _VoucherActionIcon(assetPath: 'assets/icons/share_icon.png'),
-              SizedBox(width: 10),
-              _VoucherActionIcon(assetPath: 'assets/icons/edit_icon.png'),
-              SizedBox(width: 10),
-              _VoucherActionIcon(
+            children: [
+              const _VoucherActionIcon(assetPath: 'assets/icons/print_icon.png'),
+              const SizedBox(width: 10),
+              const _VoucherActionIcon(assetPath: 'assets/icons/watch_icon.png'),
+              const SizedBox(width: 10),
+              const _VoucherActionIcon(assetPath: 'assets/icons/share_icon.png'),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: onEditTap,
+                child: const _VoucherActionIcon(
+                  assetPath: 'assets/icons/edit_icon.png',
+                ),
+              ),
+              const SizedBox(width: 10),
+              const _VoucherActionIcon(
                 assetPath: 'assets/icons/delete_icon.png',
                 backgroundColor: Color(0xFFFF4545),
                 borderColor: Color(0xFFFF4545),
