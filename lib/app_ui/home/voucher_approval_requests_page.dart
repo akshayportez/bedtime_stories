@@ -128,8 +128,8 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
                         itemBuilder: (context, index) {
                           final item = approvedItems[index];
                           return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              final shouldReload = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
@@ -138,6 +138,9 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
                                   ),
                                 ),
                               );
+                              if (shouldReload == true) {
+                                await _loadApprovedRequests();
+                              }
                             },
                             child: _VoucherApprovalRequestCard(
                               approvedBy: item.cApprovedBy ?? "",

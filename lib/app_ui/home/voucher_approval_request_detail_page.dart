@@ -17,6 +17,7 @@ class _VoucherApprovalRequestDetailPageState
   _VoucherPaymentMode _paymentMode = _VoucherPaymentMode.cash;
   int? _selectedBankId;
   DateTime? _chequeDate;
+  bool _isSuccessDialogVisible = false;
   final TextEditingController _chequeNumberController = TextEditingController();
   final TextEditingController _transactionIdController = TextEditingController();
   final TextEditingController _upiAppController = TextEditingController();
@@ -81,9 +82,160 @@ class _VoucherApprovalRequestDetailPageState
     return "$y-$m-$d";
   }
 
+  String _formatApiDate(DateTime date) {
+    return "${_formatDate(date)}T00:00:00";
+  }
+
+  String _selectedPayModeValue() {
+    switch (_paymentMode) {
+      case _VoucherPaymentMode.cash:
+        return "cash";
+      case _VoucherPaymentMode.bank:
+        return "bank";
+      case _VoucherPaymentMode.cheque:
+        return "cheque";
+      case _VoucherPaymentMode.upi:
+        return "upi";
+    }
+  }
+
+  void _showValidation(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _showSaveSuccessDialog() async {
+    if (_isSuccessDialogVisible) return;
+    _isSuccessDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.65),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  "assets/icons/succesfull_animation.gif",
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  "Successful",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Voucher Created Successfully",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _saveVoucher() async {
+    if (_paymentMode == _VoucherPaymentMode.bank && _selectedBankId == null) {
+      _showValidation("Please select bank");
+      return;
+    }
+
+    if (_paymentMode == _VoucherPaymentMode.cheque) {
+      if (_chequeNumberController.text.trim().isEmpty) {
+        _showValidation("Please enter cheque number");
+        return;
+      }
+      if (_chequeDate == null) {
+        _showValidation("Please select cheque date");
+        return;
+      }
+      if (_selectedBankId == null) {
+        _showValidation("Please select bank");
+        return;
+      }
+    }
+
+    if (_paymentMode == _VoucherPaymentMode.upi) {
+      if (_transactionIdController.text.trim().isEmpty) {
+        _showValidation("Please enter transaction id");
+        return;
+      }
+      if (_upiAppController.text.trim().isEmpty) {
+        _showValidation("Please enter UPI app");
+        return;
+      }
+    }
+
+    final userData = await BedtimeLocalStorage.getUserData();
+    final nUserActionId = int.tryParse(userData["userId"]?.toString() ?? "") ?? 0;
+    final nProjectId = await BedtimeLocalStorage.getSelectedProjectId();
+
+    final payload = {
+      "nPayVoucherId": 0,
+      "nPayReqId": widget.request.nPayReqId,
+      "cPayMode": _selectedPayModeValue(),
+      "dVoucherDate": _formatApiDate(DateTime.now()),
+      "cChequeNo": _paymentMode == _VoucherPaymentMode.cheque
+          ? _chequeNumberController.text.trim()
+          : "",
+      "dChequeDate":
+          _paymentMode == _VoucherPaymentMode.cheque && _chequeDate != null
+              ? _formatApiDate(_chequeDate!)
+              : null,
+      "nBankId":
+          (_paymentMode == _VoucherPaymentMode.bank ||
+                  _paymentMode == _VoucherPaymentMode.cheque)
+              ? (_selectedBankId ?? 0)
+              : 0,
+      "cUPIRefNo": _paymentMode == _VoucherPaymentMode.upi
+          ? _transactionIdController.text.trim()
+          : "",
+      "cComment": "",
+      "cUPIApp": _paymentMode == _VoucherPaymentMode.upi
+          ? _upiAppController.text.trim()
+          : "",
+      "nProjectId": nProjectId,
+      "nUserActionId": nUserActionId,
+      "bActive": true,
+      "nCompanyId": 1,
+    };
+
+    if (!mounted) return;
+    context.read<BedtimePaymentVoucherSaveBloc>().add(
+      BedtimePaymentVoucherSaveRequested(payload: payload),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
+    final voucherSaveState = context.watch<BedtimePaymentVoucherSaveBloc>().state;
+    final isSavingVoucher = voucherSaveState is BedtimePaymentVoucherSaving;
     final bankListState = context.watch<BedtimeGetBankListBloc>().state;
     final bankItems = bankListState is BedtimeGetBankListLoaded
         ? bankListState.banks
@@ -95,22 +247,47 @@ class _VoucherApprovalRequestDetailPageState
         ? bankListState.message
         : null;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _RequestDetailHeader(
-              title: "Voucher",
-              onBack: () => Navigator.pop(context),
-            ),
-            _StatusBanner(label: "Approved", details: _approvedBannerText()),
-            Expanded(
-              child:
-                  BlocBuilder<
-                    BedtimePaymentRequestDetailBloc,
-                    BedtimePaymentRequestDetailState
-                  >(
+    return BlocListener<BedtimePaymentVoucherSaveBloc, BedtimePaymentVoucherSaveState>(
+      listener: (context, state) async {
+        if (state is BedtimePaymentVoucherSaveSuccess) {
+          final rootNavigator = Navigator.of(context, rootNavigator: true);
+          unawaited(
+            Future<void>.delayed(const Duration(seconds: 2), () {
+              if (!rootNavigator.mounted) return;
+              if (rootNavigator.canPop()) {
+                rootNavigator.pop();
+              }
+            }),
+          );
+          await _showSaveSuccessDialog();
+          _isSuccessDialogVisible = false;
+
+          if (!context.mounted) return;
+          Navigator.pop(context, true);
+          return;
+        }
+        if (state is BedtimePaymentVoucherSaveFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _RequestDetailHeader(
+                title: "Voucher",
+                onBack: () => Navigator.pop(context),
+              ),
+              _StatusBanner(label: "Approved", details: _approvedBannerText()),
+              Expanded(
+                child:
+                    BlocBuilder<
+                      BedtimePaymentRequestDetailBloc,
+                      BedtimePaymentRequestDetailState
+                    >(
                     builder: (context, state) {
                       BedtimePaymentRequestDetail? detail;
                       List<BedtimePaymentRequestTax> taxes = [];
@@ -402,31 +579,45 @@ class _VoucherApprovalRequestDetailPageState
                                     ),
                                     const SizedBox(height: 14),
                                   ],
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: SizedBox(
-                                      width: 86,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: () {},
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF1BA8FF),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: SizedBox(
+                                        width: 86,
+                                        height: 40,
+                                        child: ElevatedButton(
+                                          onPressed: isSavingVoucher
+                                              ? null
+                                              : _saveVoucher,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFF1BA8FF),
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
                                           ),
-                                        ),
-                                        child: const Text(
-                                          "Save",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          child: isSavingVoucher
+                                              ? const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.white,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  "Save",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
                                         ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -435,8 +626,9 @@ class _VoucherApprovalRequestDetailPageState
                       );
                     },
                   ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

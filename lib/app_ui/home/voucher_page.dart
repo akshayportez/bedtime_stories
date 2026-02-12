@@ -7,9 +7,10 @@ class VoucherPage extends StatefulWidget {
   State<VoucherPage> createState() => _VoucherPageState();
 }
 
-class _VoucherPageState extends State<VoucherPage> {
+class _VoucherPageState extends State<VoucherPage> with RouteAware {
   final TextEditingController _searchController = TextEditingController();
   late final BedtimePaymentRequestBloc _voucherBloc;
+  bool _isRouteObserverSubscribed = false;
   int _projectId = 0;
   int _userActionId = 0;
   String _dFrom = "";
@@ -25,7 +26,26 @@ class _VoucherPageState extends State<VoucherPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isRouteObserverSubscribed) return;
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null) {
+      routeObserver.subscribe(this, modalRoute as ModalRoute<void>);
+      _isRouteObserverSubscribed = true;
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _loadVouchers();
+  }
+
+  @override
   void dispose() {
+    if (_isRouteObserverSubscribed) {
+      routeObserver.unsubscribe(this);
+    }
     _voucherBloc.close();
     _searchController.dispose();
     super.dispose();
