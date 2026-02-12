@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
           RequestPage(),
           ApprovalPage(),
           VoucherPage(),
-          Center(child: Text("Reports Page")),
+          ReportsPage(),
         ],
       ),
 
