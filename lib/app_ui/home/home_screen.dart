@@ -48,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: const [
           RequestPage(),
           ApprovalPage(),
-          Center(child: Text("Voucher Page")),
+          VoucherPage(),
           Center(child: Text("Reports Page")),
         ],
       ),

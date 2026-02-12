@@ -70,6 +70,7 @@ part '../app_ui/home/project_selection_screen.dart';
 part '../app_ui/home/home_screen.dart';
 part '../app_ui/home/request_page.dart';
 part '../app_ui/home/approval_page.dart';
+part '../app_ui/home/voucher_page.dart';
 part '../app_ui/home/approval_requested_page.dart';
 part '../app_ui/home/request_detail_page.dart';
 part '../app_ui/home/approval_detail_page.dart';
