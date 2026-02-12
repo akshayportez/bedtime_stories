@@ -48,174 +48,177 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF1890FF), width: 1.2),
-          ),
-          child: Column(
-            children: [
-              _RequestDetailHeader(
-                title: 'Request',
-                onBack: () => Navigator.pop(context),
-              ),
-              _StatusBanner(label: 'Approved', details: _approvedBannerText()),
-              Expanded(
-                child:
-                    BlocBuilder<
-                      BedtimePaymentRequestDetailBloc,
-                      BedtimePaymentRequestDetailState
-                    >(
-                      builder: (context, state) {
-                        BedtimePaymentRequestDetail? detail;
-                        List<BedtimePaymentRequestTax> taxes = [];
-
-                        if (state is BedtimePaymentRequestDetailLoaded) {
-                          detail = state.detail.data;
-                          taxes = state.detail.taxDtl;
-                        }
-
-                        if (state is BedtimePaymentRequestDetailFailure) {
-                          return Center(child: Text(state.message));
-                        }
-
-                        if (state is BedtimePaymentRequestDetailLoading &&
-                            detail == null) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        final requestedAmount =
-                            detail?.nRequestedAmount ?? request.nPayableAmount;
-                        final tdsPercent = detail?.nTDSPercent ?? 0.0;
-                        final tdsAmount = detail?.nTDSAmount ?? 0.0;
-                        final taxAmount = detail?.nTaxAmount ?? 0.0;
-                        final payableAmount =
-                            detail?.nPayableAmount ?? request.nPayableAmount;
-                        final comment = detail?.cComment ?? '';
-                        final attachments = _attachmentList(
-                          detail?.cAttachment ?? '',
+        child: Column(
+          children: [
+            _RequestDetailHeader(
+              title: 'Request',
+              onBack: () => Navigator.pop(context),
+            ),
+            _StatusBanner(label: 'Approved', details: _approvedBannerText()),
+            Expanded(
+              child:
+                  BlocBuilder<
+                    BedtimePaymentRequestDetailBloc,
+                    BedtimePaymentRequestDetailState
+                  >(
+                    builder: (context, state) {
+                      BedtimePaymentRequestDetail? detail;
+                      List<BedtimePaymentRequestTax> taxes = [];
+        
+                      if (state is BedtimePaymentRequestDetailLoaded) {
+                        detail = state.detail.data;
+                        taxes = state.detail.taxDtl;
+                      }
+        
+                      if (state is BedtimePaymentRequestDetailFailure) {
+                        return Center(child: Text(state.message));
+                      }
+        
+                      if (state is BedtimePaymentRequestDetailLoading &&
+                          detail == null) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
                         );
-
-                        return Column(
-                          children: [
-                            Expanded(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  8,
-                                  12,
-                                  0,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            'Req No : ${request.cRequestNo}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 21,
-                                              color: Color(0xFF222222),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          request.cRequestDateTime ?? '',
+                      }
+        
+                      final requestedAmount =
+                          detail?.nRequestedAmount ?? request.nPayableAmount;
+                      final tdsPercent = detail?.nTDSPercent ?? 0.0;
+                      final tdsAmount = detail?.nTDSAmount ?? 0.0;
+                      final taxAmount = detail?.nTaxAmount ?? 0.0;
+                      final payableAmount =
+                          detail?.nPayableAmount ?? request.nPayableAmount;
+                      final comment = detail?.cComment ?? '';
+                      final attachments = _attachmentList(
+                        detail?.cAttachment ?? '',
+                      );
+        
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                8,
+                                12,
+                                0,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Req No : ${request.cRequestNo}',
                                           style: const TextStyle(
-                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
                                             color: Color(0xFF222222),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _ApprovalInfoCard(
-                                      account: request.cAccountName,
-                                      category: request.cCategoryName,
-                                      section: request.cSectionName,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Color(0xFF222222),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'TDS : ${_money(tdsPercent)} %',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Color(0xFF222222),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Tax Details',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _ApprovalTaxTable(taxes: taxes),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      comment.isEmpty ? '-' : comment,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        height: 1.3,
-                                        color: Color(0xFF444444),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                    const Text(
-                                      'Uploaded Files',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    if (attachments.isEmpty)
-                                      const Text(
-                                        'No attachments',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF666666),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        request.cRequestDateTime ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF222222),
                                         ),
                                       ),
-                                    for (final file in attachments) ...[
-                                      _UploadRow(title: file, size: '550KB'),
-                                      const SizedBox(height: 8),
                                     ],
-                                    const SizedBox(height: 110),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _ApprovalInfoCard(
+                                    account: request.cAccountName,
+                                    category: request.cCategoryName,
+                                    section: request.cSectionName,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'TDS : ${_money(tdsPercent)} %',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Tax Details',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _ApprovalTaxTable(taxes: taxes),
+                                     const SizedBox(height: 8),
+                                  const Text(
+                                    'Comments',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    comment.isEmpty ? '-' : comment,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      height: 1.3,
+                                      color: Color(0xFF444444),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text(
+                                    'Uploaded Files',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (attachments.isEmpty)
+                                    const Text(
+                                      'No attachments',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF666666),
+                                      ),
+                                    ),
+                                  for (final file in attachments) ...[
+                                    _UploadRow(title: file, size: '550KB'),
+                                    const SizedBox(height: 8),
                                   ],
-                                ),
+                                  const SizedBox(height: 110),
+                                ],
                               ),
                             ),
-                            _ApprovalSummaryBar(
-                              requestedAmount: _money(requestedAmount),
-                              tds: _money(tdsAmount),
-                              tax: _money(taxAmount),
-                              payable: _money(payableAmount),
-                              bottomPadding: bottomInset,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-              ),
-            ],
-          ),
+                          ),
+                          _ApprovalSummaryBar(
+                            requestedAmount: _money(requestedAmount),
+                            tds: _money(tdsAmount),
+                            tax: _money(taxAmount),
+                            payable: _money(payableAmount),
+                            bottomPadding: bottomInset,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+            ),
+          ],
         ),
       ),
     );
@@ -283,20 +286,20 @@ class _ApprovalInfoRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 26,
+          height: 26,
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
             border: Border.all(color: const Color(0xFFD0D5DB)),
           ),
-          child: Icon(icon, size: 16, color: const Color(0xFF616161)),
+          child: Icon(icon, size: 15, color: const Color(0xFF616161)),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             '$title : $value',
-            style: const TextStyle(fontSize: 14, color: Color(0xFF3A3A3A)),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF3A3A3A)),
           ),
         ),
       ],
@@ -336,13 +339,13 @@ class _ApprovalTaxTable extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Tax Name',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                 ),
                 Expanded(
                   child: Text(
                     'Tax Rate %',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],

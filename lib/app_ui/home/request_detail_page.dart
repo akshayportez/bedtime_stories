@@ -711,31 +711,38 @@ class _UploadRow extends StatelessWidget {
             child: const Icon(Icons.image, size: 20, color: Colors.black54),
           ),
           const SizedBox(width: 10),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1F1F1F),
-                ),
-              ),
-              if (size.isNotEmpty) ...[
-                const SizedBox(height: 3),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  size,
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w300,
-                    color: Color(0xFF494949),
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1F1F1F),
                   ),
                 ),
+                if (size.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    size,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: Color(0xFF494949),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
     );
