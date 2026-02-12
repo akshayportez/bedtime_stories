@@ -37,6 +37,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   String _editingStatus = "Requested";
   int _uploadCounter = 0;
   bool _isSaving = false;
+  bool _isSuccessDialogVisible = false;
   final List<_CreateRequestUploadItem> _uploadItems = [];
 
   final List<String> taxOptions = [];
@@ -286,6 +287,61 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     });
   }
 
+  Future<void> _showSaveSuccessDialog() async {
+    if (_isSuccessDialogVisible) return;
+    _isSuccessDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            // width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.65),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  "assets/icons/succesfull_animation.gif",
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  "Successful",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Payment Request Submitted Successfully",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _requestedAmountController.dispose();
@@ -350,15 +406,18 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             if (state is BedtimePaymentRequestSaveSuccess) {
               if (!mounted) return;
               setState(() => _isSaving = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    state.response.cMessage.isEmpty
-                        ? "Request saved successfully"
-                        : state.response.cMessage,
-                  ),
-                ),
+
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
+              unawaited(
+                Future<void>.delayed(const Duration(seconds: 2), () {
+                  if (!rootNavigator.mounted) return;
+                  if (rootNavigator.canPop()) {
+                    rootNavigator.pop();
+                  }
+                }),
               );
+              await _showSaveSuccessDialog();
+              _isSuccessDialogVisible = false;
 
               final userData = await BedtimeLocalStorage.getUserData();
               final companyId = _resolveInt(userData["companyId"], fallback: 1);

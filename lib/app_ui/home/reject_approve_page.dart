@@ -12,6 +12,7 @@ class RejectApprovePage extends StatefulWidget {
 class _RejectApprovePageState extends State<RejectApprovePage> {
   bool _isApproving = false;
   bool _isRejecting = false;
+  bool _isResultDialogVisible = false;
 
   String _money(double value) => value.toStringAsFixed(2);
   int _resolveInt(dynamic value, {int fallback = 0}) {
@@ -45,6 +46,64 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
     final on = (widget.request.cRequestDateTime ?? '').trim();
     if (on.isEmpty) return '(by $by)';
     return '(by $by on $on)';
+  }
+
+  Future<void> _showActionSuccessDialog({
+    required String gifPath,
+    required String title,
+    required String message,
+  }) async {
+    if (_isResultDialogVisible) return;
+    _isResultDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.65),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  gifPath,
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onApproveTapped() async {
@@ -103,16 +162,24 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
             }
             if (state is BedtimeRequestApproveSuccess) {
               if (mounted) setState(() => _isApproving = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    state.response.cMessage.isEmpty
-                        ? "Approved successfully"
-                        : state.response.cMessage,
-                  ),
-                ),
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
+              unawaited(
+                Future<void>.delayed(const Duration(seconds: 2), () {
+                  if (!rootNavigator.mounted) return;
+                  if (rootNavigator.canPop()) {
+                    rootNavigator.pop();
+                  }
+                }),
               );
-              Navigator.pop(context, true);
+              _showActionSuccessDialog(
+                gifPath: "assets/icons/succesfull_animation.gif",
+                title: "Approved",
+                message: "Payment Request Approved Successfully",
+              ).then((_) {
+                _isResultDialogVisible = false;
+                if (!mounted) return;
+                Navigator.pop(context, true);
+              });
             }
           },
         ),
@@ -131,16 +198,24 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
             }
             if (state is BedtimeRequestRejectSuccess) {
               if (mounted) setState(() => _isRejecting = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    state.response.cMessage.isEmpty
-                        ? "Rejected successfully"
-                        : state.response.cMessage,
-                  ),
-                ),
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
+              unawaited(
+                Future<void>.delayed(const Duration(seconds: 2), () {
+                  if (!rootNavigator.mounted) return;
+                  if (rootNavigator.canPop()) {
+                    rootNavigator.pop();
+                  }
+                }),
               );
-              Navigator.pop(context, true);
+              _showActionSuccessDialog(
+                gifPath: "assets/icons/rejected_animation.gif",
+                title: "Rejected",
+                message: "Payment Request Rejected",
+              ).then((_) {
+                _isResultDialogVisible = false;
+                if (!mounted) return;
+                Navigator.pop(context, true);
+              });
             }
           },
         ),
