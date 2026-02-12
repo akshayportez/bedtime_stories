@@ -12,6 +12,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<String> tabs = ["Request", "Approval", "Voucher", "Reports"];
 
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
+  Future<void> _reloadApprovalList() async {
+    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userActionId = _resolveInt(userData["userId"]);
+
+    if (!mounted) return;
+    context.read<BedtimePaymentRequestBloc>().add(
+      BedtimePaymentRequestLoadRequested(
+        companyId: 1,
+        projectId: projectId,
+        userActionId: userActionId,
+        search: "",
+        statusFilter: "",
+        dFrom: "",
+        dTo: "",
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,7 +57,17 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: appPrimaryColor,
         shape: const CircleBorder(),
-        onPressed: () {
+        onPressed: () async {
+          if (selectedIndex == 1) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ApprovalRequestedPage(),
+              ),
+            );
+            await _reloadApprovalList();
+            return;
+          }
           Navigator.pushNamed(context, "/createRequestPage");
         },
         child: const Icon(Icons.add, size: 28, color: Colors.white),

@@ -355,6 +355,7 @@ class _ApprovalCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       "Req No : $reqNo",
@@ -379,6 +380,7 @@ class _ApprovalCard extends StatelessWidget {
                 Container(height: 2, color: const Color(0xFFF3F7FC)),
                 const SizedBox(height: 8),
                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
