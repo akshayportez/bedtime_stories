@@ -123,13 +123,16 @@ class _ApprovalRequestedPageState extends State<ApprovalRequestedPage> {
                         itemBuilder: (context, index) {
                           final request = requestedItems[index];
                           return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              final approved = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ApprovalDetailPage(request: request),
+                                  builder: (_) => RejectApprovePage(request: request),
                                 ),
                               );
+                              if (approved == true) {
+                                await _loadRequests();
+                              }
                             },
                             child: _ApprovalRequestedCard(
                               reqNo: request.cRequestNo,

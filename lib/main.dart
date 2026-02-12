@@ -28,6 +28,12 @@ import 'package:bedtime_stories/app_ui/home/bloc/payment_request_save_bloc/bedti
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_approve_bloc/bedtime_request_approve_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_approve_bloc/bedtime_request_approve_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_approve_bloc/bedtime_request_approve_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_reject_bloc/bedtime_request_reject_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_reject_bloc/bedtime_request_reject_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/request_reject_bloc/bedtime_request_reject_repository.dart';
 import 'package:bedtime_stories/app_ui/login/bloc/bedtime_auth_api_provider.dart';
 import 'package:bedtime_stories/app_ui/login/bloc/bedtime_auth_repository.dart';
 import 'package:bedtime_stories/app_ui/login/bloc/bedtime_login_bloc.dart';
@@ -112,6 +118,20 @@ Future<void> main() async {
       create: (_) => BedtimePaymentRequestDetailBloc(
         BedtimePaymentRequestDetailRepository(
           BedtimePaymentRequestDetailApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimeRequestApproveBloc(
+        BedtimeRequestApproveRepository(
+          BedtimeRequestApproveApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimeRequestRejectBloc(
+        BedtimeRequestRejectRepository(
+          BedtimeRequestRejectApiProvider(),
         ),
       ),
     ),
