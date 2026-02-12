@@ -39,16 +39,16 @@ class _ApprovalPageState extends State<ApprovalPage> {
     if (!mounted) return;
 
     context.read<BedtimePaymentRequestBloc>().add(
-          BedtimePaymentRequestLoadRequested(
-            companyId: 1,
-            projectId: projectId,
-            userActionId: _userActionId,
-            search: "",
-            statusFilter: _statusFilter,
-            dFrom: _dFrom,
-            dTo: _dTo,
-          ),
-        );
+      BedtimePaymentRequestLoadRequested(
+        companyId: 1,
+        projectId: projectId,
+        userActionId: _userActionId,
+        search: "",
+        statusFilter: _statusFilter,
+        dFrom: _dFrom,
+        dTo: _dTo,
+      ),
+    );
   }
 
   Future<void> _openProjectSelectionSheet() async {
@@ -78,21 +78,6 @@ class _ApprovalPageState extends State<ApprovalPage> {
             : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
         _userActionId = resolvedUserId;
         context.read<BedtimePaymentRequestBloc>().add(
-              BedtimePaymentRequestSearchRequested(
-                companyId: 1,
-                projectId: _projectId,
-                userActionId: _userActionId,
-                search: value.trim(),
-                statusFilter: _statusFilter,
-                dFrom: _dFrom,
-                dTo: _dTo,
-              ),
-            );
-      });
-      return;
-    }
-
-    context.read<BedtimePaymentRequestBloc>().add(
           BedtimePaymentRequestSearchRequested(
             companyId: 1,
             projectId: _projectId,
@@ -103,6 +88,21 @@ class _ApprovalPageState extends State<ApprovalPage> {
             dTo: _dTo,
           ),
         );
+      });
+      return;
+    }
+
+    context.read<BedtimePaymentRequestBloc>().add(
+      BedtimePaymentRequestSearchRequested(
+        companyId: 1,
+        projectId: _projectId,
+        userActionId: _userActionId,
+        search: value.trim(),
+        statusFilter: _statusFilter,
+        dFrom: _dFrom,
+        dTo: _dTo,
+      ),
+    );
   }
 
   String _formatDate(DateTime date) {
@@ -179,9 +179,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: BedtimeGradientAppBar(
-        onProjectTap: _openProjectSelectionSheet,
-      ),
+      appBar: BedtimeGradientAppBar(onProjectTap: _openProjectSelectionSheet),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
@@ -230,70 +228,83 @@ class _ApprovalPageState extends State<ApprovalPage> {
             ),
             const SizedBox(height: 14),
             Expanded(
-              child: BlocBuilder<BedtimePaymentRequestBloc,
-                  BedtimePaymentRequestState>(
-                builder: (context, state) {
-                  if (state is BedtimePaymentRequestLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              child:
+                  BlocBuilder<
+                    BedtimePaymentRequestBloc,
+                    BedtimePaymentRequestState
+                  >(
+                    builder: (context, state) {
+                      if (state is BedtimePaymentRequestLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                  if (state is BedtimePaymentRequestFailure) {
-                    return Center(child: Text(state.message));
-                  }
+                      if (state is BedtimePaymentRequestFailure) {
+                        return Center(child: Text(state.message));
+                      }
 
-                  if (state is BedtimePaymentRequestLoaded) {
-                    final approvals = state.requests
-                        .where((r) => _isApprovalStatus(r.cStatus))
-                        .where((r) => _matchesStatusFilter(r.cStatus))
-                        .toList();
+                      if (state is BedtimePaymentRequestLoaded) {
+                        final approvals = state.requests
+                            .where((r) => _isApprovalStatus(r.cStatus))
+                            .where((r) => _matchesStatusFilter(r.cStatus))
+                            .toList();
 
-                    if (approvals.isEmpty) {
-                      return const Center(child: Text("No approvals found"));
-                    }
+                        if (approvals.isEmpty) {
+                          return const Center(
+                            child: Text("No approvals found"),
+                          );
+                        }
 
-                    final bottomInset = MediaQuery.of(context).padding.bottom;
-                    return ListView.builder(
-                      padding: EdgeInsets.only(bottom: 16 + bottomInset + 96),
-                      itemCount: approvals.length,
-                      itemBuilder: (context, index) {
-                        final request = approvals[index];
-                        return GestureDetector(
-                          onTap: () async {
-                            final deleted = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    RequestDetailPage(request: request),
+                        final bottomInset = MediaQuery.of(
+                          context,
+                        ).padding.bottom;
+                        return ListView.builder(
+                          padding: EdgeInsets.only(
+                            bottom: 16 + bottomInset + 96,
+                          ),
+                          itemCount: approvals.length,
+                          itemBuilder: (context, index) {
+                            final request = approvals[index];
+                            return GestureDetector(
+                              onTap: () async {
+                                final deleted = await Navigator.push<bool>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ApprovalDetailPage(request: request),
+                                  ),
+                                );
+                                if (deleted == true) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Deleted successfully"),
+                                    ),
+                                  );
+                                  await _loadApprovals();
+                                }
+                              },
+                              child: _ApprovalCard(
+                                reqNo: request.cRequestNo,
+                                requestedBy: request.cRequestedBy,
+                                requestDate: request.cRequestDateTime ?? "-",
+                                actionDate: _actionDateValue(request),
+                                accountName: request.cAccountName,
+                                category: request.cCategoryName,
+                                section: request.cSectionName,
+                                amount: _formatAmount(request.nPayableAmount),
+                                status: _displayStatus(request.cStatus),
+                                statusColor: _statusColor(request.cStatus),
                               ),
                             );
-                            if (deleted == true) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Deleted successfully"),
-                                ),
-                              );
-                              await _loadApprovals();
-                            }
                           },
-                          child: _ApprovalCard(
-                            reqNo: request.cRequestNo,
-                            requestedBy: request.cRequestedBy,
-                            requestDate: request.cRequestDateTime ?? "-",
-                            actionDate: _actionDateValue(request),
-                            accountName: request.cAccountName,
-                            amount: _formatAmount(request.nPayableAmount),
-                            status: _displayStatus(request.cStatus),
-                            statusColor: _statusColor(request.cStatus),
-                          ),
                         );
-                      },
-                    );
-                  }
+                      }
 
-                  return const SizedBox();
-                },
-              ),
+                      return const SizedBox();
+                    },
+                  ),
             ),
           ],
         ),
@@ -308,6 +319,8 @@ class _ApprovalCard extends StatelessWidget {
   final String requestDate;
   final String actionDate;
   final String accountName;
+  final String category;
+  final String section;
   final String amount;
   final String status;
   final Color statusColor;
@@ -318,6 +331,8 @@ class _ApprovalCard extends StatelessWidget {
     required this.requestDate,
     required this.actionDate,
     required this.accountName,
+    required this.category,
+    required this.section,
     required this.amount,
     required this.status,
     required this.statusColor,
@@ -328,7 +343,7 @@ class _ApprovalCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color:  Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFCADDF4)),
       ),
@@ -340,7 +355,30 @@ class _ApprovalCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Req No : $reqNo",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      requestDate,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF3B3B3B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(height: 2, color: const Color(0xFFF3F7FC)),
+                const SizedBox(height: 8),
+                Row(
                   children: [
                     Expanded(
                       child: Text(
@@ -348,9 +386,9 @@ class _ApprovalCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
                           fontSize: 14,
                           color: statusColor,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -363,48 +401,45 @@ class _ApprovalCard extends StatelessWidget {
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w300,
                           color: Color(0xFF3B3B3B),
+                          fontWeight: FontWeight.w300,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Container(height: 2, color: const Color(0xFFF3F7FC)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    CircleAvatar(
+                      radius: 15,
+                      backgroundColor: const Color(0xFFEAF2FF),
+                      child: Text(
+                        accountName.isNotEmpty
+                            ? accountName[0].toUpperCase()
+                            : "",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        "Req No : $reqNo",
+                        accountName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: const Color(0xFF2C2C2C),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        requestDate,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF3B3B3B),
-                          fontWeight: FontWeight.w300,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Color(0xFF333333),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     const Text(
@@ -429,30 +464,51 @@ class _ApprovalCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 15,
-                      backgroundColor: const Color(0xFFEAF2FF),
-                      child: Text(
-                        accountName.isNotEmpty ? accountName[0].toUpperCase() : "",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF333333),
-                        ),
+                    const Text(
+                      "Category",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF2C2C2C),
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        accountName,
+                        " : $category",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: Color(0xFF333333),
+                          color: Color(0xFF7F7F7F),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Text(
+                      "Section",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF2C2C2C),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        " : $section",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7F7F7F),
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ),
@@ -462,20 +518,18 @@ class _ApprovalCard extends StatelessWidget {
             ),
           ),
           Container(
-            height: 44,
+            height: 39,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F8),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(9),
-              ),
+              color: const Color(0xFFF6F9FC),
+              borderRadius: BorderRadius.circular(9),
             ),
             child: Row(
               children: [
                 Image.asset(
                   "assets/icons/payment_animation.gif",
-                  width: 24,
-                  height: 24,
+                  width: 30,
+                  height: 30,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(width: 6),
@@ -483,18 +537,40 @@ class _ApprovalCard extends StatelessWidget {
                   "Payable Amt : ",
                   style: TextStyle(fontSize: 12, color: Color(0xFF7F7F7F)),
                 ),
-                Expanded(
+                Flexible(
                   child: Text(
                     "\u20B9$amount",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.left,
+                    textAlign: TextAlign.right,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF256DFB),
                     ),
                   ),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -53,7 +53,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:image_picker/image_picker.dart';
 
-
 /// Parts
 part 'globals.dart';
 part 'app_routes.dart';
@@ -66,5 +65,5 @@ part '../app_ui/home/home_screen.dart';
 part '../app_ui/home/request_page.dart';
 part '../app_ui/home/approval_page.dart';
 part '../app_ui/home/request_detail_page.dart';
+part '../app_ui/home/approval_detail_page.dart';
 part '../app_ui/home/create_request_page.dart';
-
