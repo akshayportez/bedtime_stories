@@ -10,6 +10,7 @@ class BedtimeApiEndpoints {
   static const String paymentRequestUpload = "/PaymentRequest/upload";
   static const String paymentRequestSave = "/PaymentRequest/save";
   static const String paymentVoucherSave = "/PaymentVoucher/save";
+  static const String paymentVoucherByRequest = "/PaymentVoucher/by-request";
   static const String requestApprove = "/PaymentApproval/approve";
   static const String requestReject = "/PaymentApproval/reject";
   static const String accountSave = "/Account/save";

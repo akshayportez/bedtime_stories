@@ -15,8 +15,8 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   @override
   void initState() {
     super.initState();
-    context.read<BedtimePaymentRequestDetailBloc>().add(
-      BedtimePaymentRequestDetailLoadRequested(
+    context.read<BedtimePaymentVoucherDetailBloc>().add(
+      BedtimePaymentVoucherDetailLoadRequested(
         companyId: 1,
         payReqId: widget.request.nPayReqId,
       ),
@@ -40,6 +40,17 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     return '(by $by on $on)';
   }
 
+  List<String> _mergeAttachments(
+    List<String> files,
+    String rawAttachment,
+  ) {
+    final result = <String>{...files};
+    for (final path in _attachmentList(rawAttachment)) {
+      result.add(path);
+    }
+    return result.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -58,40 +69,53 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
             Expanded(
               child:
                   BlocBuilder<
-                    BedtimePaymentRequestDetailBloc,
-                    BedtimePaymentRequestDetailState
+                    BedtimePaymentVoucherDetailBloc,
+                    BedtimePaymentVoucherDetailState
                   >(
                 builder: (context, state) {
-                  BedtimePaymentRequestDetail? detail;
-                  List<BedtimePaymentRequestTax> taxes = [];
+                  BedtimePaymentVoucherDetailResponse? detail;
 
-                  if (state is BedtimePaymentRequestDetailLoaded) {
-                    detail = state.detail.data;
-                    taxes = state.detail.taxDtl;
+                  if (state is BedtimePaymentVoucherDetailLoaded) {
+                    detail = state.detail;
                   }
 
-                  if (state is BedtimePaymentRequestDetailFailure) {
+                  if (state is BedtimePaymentVoucherDetailFailure) {
                     return Center(child: Text(state.message));
                   }
 
-                  if (state is BedtimePaymentRequestDetailLoading &&
+                  if (state is BedtimePaymentVoucherDetailLoading &&
                       detail == null) {
                     return const Center(
                       child: CircularProgressIndicator(),
                     );
                   }
 
+                  final reqHdr = detail?.reqHdr;
+                  final payDtl = detail?.payDtl;
+                  final voucherHdr = detail?.voucherHdr;
+                  final taxes = (detail?.taxDtl ?? const <BedtimePaymentVoucherTax>[])
+                      .map(
+                        (e) => BedtimePaymentRequestTax(
+                          nTaxId: e.nTaxId,
+                          cTaxName: e.cTaxName,
+                          nTaxRate: e.nTaxRate,
+                        ),
+                      )
+                      .toList();
+
                   final requestedAmount =
-                      detail?.nRequestedAmount ?? request.nPayableAmount;
-                  final tdsPercent = detail?.nTDSPercent ?? 0.0;
-                  final tdsAmount = detail?.nTDSAmount ?? 0.0;
-                  final taxAmount = detail?.nTaxAmount ?? 0.0;
+                      reqHdr?.nRequestedAmount ?? request.nPayableAmount;
+                  final tdsPercent = reqHdr?.nTDSPercent ?? 0.0;
+                  final tdsAmount = reqHdr?.nTDSAmt ?? 0.0;
+                  final taxAmount = reqHdr?.nTaxAmount ?? 0.0;
                   final payableAmount =
-                      detail?.nPayableAmount ?? request.nPayableAmount;
-                  final comment = detail?.cComment ?? '';
-                  final attachments = _attachmentList(
-                    detail?.cAttachment ?? '',
+                      reqHdr?.nPayableAmount ?? request.nPayableAmount;
+                  final comment = reqHdr?.cComment ?? '';
+                  final attachments = _mergeAttachments(
+                    detail?.files ?? const [],
+                    reqHdr?.cAttachment ?? '',
                   );
+                  final payMode = (voucherHdr?.cPayMode ?? '').trim();
 
                   return Column(
                     children: [
@@ -110,7 +134,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      'Voucher No : ${request.cVoucherNo ?? request.cRequestNo}',
+                                      'Voucher No : ${(request.cVoucherNo ?? '').isEmpty ? request.cRequestNo : (request.cVoucherNo ?? '')}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 16,
@@ -131,10 +155,16 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              _ApprovalInfoCard(
-                                account: request.cAccountName,
-                                category: request.cCategoryName,
-                                section: request.cSectionName,
+                                  _ApprovalInfoCard(
+                                account: reqHdr?.cAccountName.isNotEmpty == true
+                                    ? reqHdr!.cAccountName
+                                    : request.cAccountName,
+                                category: reqHdr?.cCategoryName.isNotEmpty == true
+                                    ? reqHdr!.cCategoryName
+                                    : request.cCategoryName,
+                                section: reqHdr?.cSectionName.isNotEmpty == true
+                                    ? reqHdr!.cSectionName
+                                    : request.cSectionName,
                               ),
                               const SizedBox(height: 10),
                               Text(
@@ -213,6 +243,12 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                         tds: _money(tdsAmount),
                         tax: _money(taxAmount),
                         payable: _money(payableAmount),
+                        payMode: payMode,
+                        chequeNumber: payDtl?.cChequeNo ?? '',
+                        chequeDate: payDtl?.dChequeDate ?? '',
+                        bankName: payDtl?.cBankName ?? '',
+                        upiRefNo: payDtl?.cUPIRefNo ?? '',
+                        upiApp: payDtl?.cUpiApp ?? '',
                         bottomPadding: bottomInset,
                       ),
                     ],
@@ -232,6 +268,12 @@ class _VoucherViewSummaryBar extends StatelessWidget {
   final String tds;
   final String tax;
   final String payable;
+  final String payMode;
+  final String chequeNumber;
+  final String chequeDate;
+  final String bankName;
+  final String upiRefNo;
+  final String upiApp;
   final double bottomPadding;
 
   const _VoucherViewSummaryBar({
@@ -239,8 +281,80 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.tds,
     required this.tax,
     required this.payable,
+    required this.payMode,
+    required this.chequeNumber,
+    required this.chequeDate,
+    required this.bankName,
+    required this.upiRefNo,
+    required this.upiApp,
     required this.bottomPadding,
   });
+
+  List<Widget> _payModeInfo() {
+    final mode = payMode.trim().toLowerCase();
+    final rows = <Widget>[
+      Text(
+        'Paymode : ${payMode.isEmpty ? '-' : payMode}',
+        style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+      ),
+    ];
+
+    if (mode == 'bank') {
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'Bank Name : ${bankName.isEmpty ? '-' : bankName}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      return rows;
+    }
+
+    if (mode == 'cheque') {
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'Cheque number : ${chequeNumber.isEmpty ? '-' : chequeNumber}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'Date : ${chequeDate.isEmpty ? '-' : chequeDate}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'Bank Name : ${bankName.isEmpty ? '-' : bankName}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      return rows;
+    }
+
+    if (mode == 'upi') {
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'UPI Ref No : ${upiRefNo.isEmpty ? '-' : upiRefNo}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      rows.add(const SizedBox(height: 3));
+      rows.add(
+        Text(
+          'UPI App : ${upiApp.isEmpty ? '-' : upiApp}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
+        ),
+      );
+      return rows;
+    }
+
+    return rows;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -277,25 +391,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
             isBold: true,
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Paymode : Cheque',
-            style: TextStyle(fontSize: 12, color: Color(0xFF333333)),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Cheque number : 895845444444',
-            style: TextStyle(fontSize: 12, color: Color(0xFF333333)),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Date : 04/02/2026',
-            style: TextStyle(fontSize: 12, color: Color(0xFF333333)),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Bank Name : HDFC',
-            style: TextStyle(fontSize: 12, color: Color(0xFF333333)),
-          ),
+          ..._payModeInfo(),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
