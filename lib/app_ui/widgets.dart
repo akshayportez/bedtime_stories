@@ -93,6 +93,122 @@ class BedtimeGradientAppBar extends StatelessWidget
 
   const BedtimeGradientAppBar({super.key, this.onProjectTap});
 
+  Future<void> _onUserSectionTap(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Image.asset(
+                      "assets/icons/logout_animation.gif",
+                      width: 50,
+                      height: 54,
+                      fit: BoxFit.contain,
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => Navigator.of(dialogContext).pop(false),
+                      child: const Icon(Icons.close, size: 38, color: Colors.black),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  "Come back soon!",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Are you sure you want to logout?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF5F5F5F),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.black, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor: const Color(0xFFEFEFEF),
+                          ),
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 22),
+                    Expanded(
+                      child: SizedBox(
+                        height: 54,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: const Color(0xFFF44336),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          child: const Text(
+                            "Logout",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldLogout != true) return;
+
+    await BedtimeLocalStorage.clearSession();
+    if (!context.mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -157,42 +273,44 @@ class BedtimeGradientAppBar extends StatelessWidget
                 const Spacer(),
 
                 /// ✅ Right Side (User Name)
-                Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(color: Colors.black87, width: 1),
-                      ),
-                      child: Center(
-                        child: Image.asset(
-                          "assets/icons/user_icon.png",
-                          width: 16,
-                          height: 16,
-                          fit: BoxFit.contain,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _onUserSectionTap(context),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(color: Colors.black87, width: 1),
+                        ),
+                        child: Center(
+                          child: Image.asset(
+                            "assets/icons/user_icon.png",
+                            width: 16,
+                            height: 16,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
-                    ),
-
-                    const SizedBox(width: 5),
-
-                    FutureBuilder(
-                      future: BedtimeLocalStorage.getUserName(),
-                      builder: (context, snapshot) {
-                        return Text(
-                          snapshot.data ?? "",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                      const SizedBox(width: 5),
+                      FutureBuilder(
+                        future: BedtimeLocalStorage.getUserName(),
+                        builder: (context, snapshot) {
+                          return Text(
+                            snapshot.data ?? "",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
