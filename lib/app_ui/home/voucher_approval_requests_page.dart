@@ -127,13 +127,26 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
                         itemCount: approvedItems.length,
                         itemBuilder: (context, index) {
                           final item = approvedItems[index];
-                          return _VoucherApprovalRequestCard(
-                            approvedBy: item.cApprovedBy ?? "",
-                            approvedDate: item.cApprovedDateTime ?? "-",
-                            reqNo: item.cRequestNo,
-                            requestDate: item.cRequestDateTime ?? "-",
-                            accountName: item.cAccountName,
-                            amount: _formatAmount(item.nPayableAmount),
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      VoucherApprovalRequestDetailPage(
+                                    request: item,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: _VoucherApprovalRequestCard(
+                              approvedBy: item.cApprovedBy ?? "",
+                              approvedDate: item.cApprovedDateTime ?? "-",
+                              reqNo: item.cRequestNo,
+                              requestDate: item.cRequestDateTime ?? "-",
+                              accountName: item.cAccountName,
+                              amount: _formatAmount(item.nPayableAmount),
+                            ),
                           );
                         },
                       );

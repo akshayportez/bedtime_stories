@@ -72,6 +72,7 @@ part '../app_ui/home/request_page.dart';
 part '../app_ui/home/approval_page.dart';
 part '../app_ui/home/voucher_page.dart';
 part '../app_ui/home/voucher_approval_requests_page.dart';
+part '../app_ui/home/voucher_approval_request_detail_page.dart';
 part '../app_ui/home/approval_requested_page.dart';
 part '../app_ui/home/request_detail_page.dart';
 part '../app_ui/home/approval_detail_page.dart';
