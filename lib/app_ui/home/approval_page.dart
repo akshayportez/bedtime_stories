@@ -266,20 +266,20 @@ class _ApprovalPageState extends State<ApprovalPage> {
                             final request = approvals[index];
                             return GestureDetector(
                               onTap: () async {
-                                final deleted = await Navigator.push<bool>(
+                                final updated = await Navigator.push<bool>(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         ApprovalDetailPage(request: request),
                                   ),
                                 );
-                                if (deleted == true) {
+                                if (updated == true) {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(
                                     this.context,
                                   ).showSnackBar(
                                     const SnackBar(
-                                      content: Text("Deleted successfully"),
+                                      content: Text("Updated successfully"),
                                     ),
                                   );
                                   await _loadApprovals();
@@ -357,12 +357,16 @@ class _ApprovalCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Req No : $reqNo",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: Color(0xFF333333),
+                       Expanded(
+                      child: Text(
+                        status,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const Spacer(),
@@ -380,18 +384,14 @@ class _ApprovalCard extends StatelessWidget {
                 Container(height: 2, color: const Color(0xFFF3F7FC)),
                 const SizedBox(height: 8),
                 Row(
-                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Text(
-                        status,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      "Req No : $reqNo",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF333333),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -405,6 +405,31 @@ class _ApprovalCard extends StatelessWidget {
                           fontSize: 12,
                           color: Color(0xFF3B3B3B),
                           fontWeight: FontWeight.w300,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text(
+                      "Requested by : ",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF2C2C2C),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        requestedBy,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7F7F7F),
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ),
@@ -441,81 +466,7 @@ class _ApprovalCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Text(
-                      "Requested by : ",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF2C2C2C),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        requestedBy,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF7F7F7F),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Text(
-                      "Category",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF2C2C2C),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        " : $category",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF7F7F7F),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Text(
-                      "Section",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF2C2C2C),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        " : $section",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF7F7F7F),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              
               ],
             ),
           ),
@@ -552,28 +503,7 @@ class _ApprovalCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: statusColor,
-                      ),
-                    ),
-                  ],
-                ),
+              
               ],
             ),
           ),

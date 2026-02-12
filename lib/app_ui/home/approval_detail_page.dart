@@ -11,8 +11,14 @@ class ApprovalDetailPage extends StatefulWidget {
 
 class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   bool _showActionButtons = false;
+  bool _isApproving = false;
+  bool _isRejecting = false;
 
   String _money(double value) => value.toStringAsFixed(2);
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
 
   @override
   void initState() {
@@ -42,27 +48,116 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
     return '(by $by on $on)';
   }
 
+  Future<void> _onApproveTapped() async {
+    if (_isApproving || _isRejecting) return;
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userActionId = _resolveInt(userData["userId"]);
+    if (!mounted) return;
+    context.read<BedtimeRequestApproveBloc>().add(
+      BedtimeRequestApproveRequested(
+        nPayReqId: widget.request.nPayReqId,
+        nCompanyId: 1,
+        nUserActionId: userActionId,
+        cApprovalComment: "",
+      ),
+    );
+  }
+
+  Future<void> _onRejectTapped() async {
+    if (_isApproving || _isRejecting) return;
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userActionId = _resolveInt(userData["userId"]);
+    if (!mounted) return;
+    context.read<BedtimeRequestRejectBloc>().add(
+      BedtimeRequestRejectRequested(
+        nPayReqId: widget.request.nPayReqId,
+        nCompanyId: 1,
+        nUserActionId: userActionId,
+        cApprovalComment: " ",
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _RequestDetailHeader(
-              title: 'Request',
-              onBack: () => Navigator.pop(context),
-            ),
-            _StatusBanner(label: 'Approved', details: _approvedBannerText()),
-            Expanded(
-              child:
-                  BlocBuilder<
-                    BedtimePaymentRequestDetailBloc,
-                    BedtimePaymentRequestDetailState
-                  >(
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<BedtimeRequestApproveBloc, BedtimeRequestApproveState>(
+          listener: (context, state) {
+            if (state is BedtimeRequestApproveLoading) {
+              if (mounted) setState(() => _isApproving = true);
+              return;
+            }
+            if (state is BedtimeRequestApproveFailure) {
+              if (mounted) setState(() => _isApproving = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+              return;
+            }
+            if (state is BedtimeRequestApproveSuccess) {
+              if (mounted) setState(() => _isApproving = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.response.cMessage.isEmpty
+                        ? "Approved successfully"
+                        : state.response.cMessage,
+                  ),
+                ),
+              );
+              Navigator.pop(context, true);
+            }
+          },
+        ),
+        BlocListener<BedtimeRequestRejectBloc, BedtimeRequestRejectState>(
+          listener: (context, state) {
+            if (state is BedtimeRequestRejectLoading) {
+              if (mounted) setState(() => _isRejecting = true);
+              return;
+            }
+            if (state is BedtimeRequestRejectFailure) {
+              if (mounted) setState(() => _isRejecting = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+              return;
+            }
+            if (state is BedtimeRequestRejectSuccess) {
+              if (mounted) setState(() => _isRejecting = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.response.cMessage.isEmpty
+                        ? "Rejected successfully"
+                        : state.response.cMessage,
+                  ),
+                ),
+              );
+              Navigator.pop(context, true);
+            }
+          },
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _RequestDetailHeader(
+                title: 'Request',
+                onBack: () => Navigator.pop(context),
+              ),
+              _StatusBanner(label: 'Approved', details: _approvedBannerText()),
+              Expanded(
+                child:
+                    BlocBuilder<
+                      BedtimePaymentRequestDetailBloc,
+                      BedtimePaymentRequestDetailState
+                    >(
                     builder: (context, state) {
                       BedtimePaymentRequestDetail? detail;
                       List<BedtimePaymentRequestTax> taxes = [];
@@ -208,25 +303,28 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                               ),
                             ),
                           ),
-                          _ApprovalSummaryBar(
-                            requestedAmount: _money(requestedAmount),
-                            tds: _money(tdsAmount),
-                            tax: _money(taxAmount),
-                            payable: _money(payableAmount),
-                            bottomPadding: bottomInset,
-                            showActionButtons: _showActionButtons,
-                            onEditTap: () {
-                              setState(() => _showActionButtons = true);
-                            },
-                            onRejectTap: () {},
-                            onApproveTap: () {},
-                          ),
+                            _ApprovalSummaryBar(
+                              requestedAmount: _money(requestedAmount),
+                              tds: _money(tdsAmount),
+                              tax: _money(taxAmount),
+                              payable: _money(payableAmount),
+                              bottomPadding: bottomInset,
+                              showActionButtons: _showActionButtons,
+                              isApproving: _isApproving,
+                              isRejecting: _isRejecting,
+                              onEditTap: () {
+                                setState(() => _showActionButtons = true);
+                              },
+                              onRejectTap: _onRejectTapped,
+                              onApproveTap: _onApproveTapped,
+                            ),
                         ],
                       );
                     },
-                  ),
-            ),
-          ],
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -402,6 +500,8 @@ class _ApprovalSummaryBar extends StatelessWidget {
   final String payable;
   final double bottomPadding;
   final bool showActionButtons;
+  final bool isApproving;
+  final bool isRejecting;
   final VoidCallback onEditTap;
   final VoidCallback onRejectTap;
   final VoidCallback onApproveTap;
@@ -413,6 +513,8 @@ class _ApprovalSummaryBar extends StatelessWidget {
     required this.payable,
     required this.bottomPadding,
     required this.showActionButtons,
+    required this.isApproving,
+    required this.isRejecting,
     required this.onEditTap,
     required this.onRejectTap,
     required this.onApproveTap,
@@ -479,7 +581,7 @@ class _ApprovalSummaryBar extends StatelessWidget {
                     SizedBox(
                       height: 40,
                       child: ElevatedButton(
-                        onPressed: onRejectTap,
+                        onPressed: (isApproving || isRejecting) ? null : onRejectTap,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF4B4B),
                           elevation: 0,
@@ -488,21 +590,32 @@ class _ApprovalSummaryBar extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Reject',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: isRejecting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Reject',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     SizedBox(
                       height: 40,
                       child: ElevatedButton(
-                        onPressed: onApproveTap,
+                        onPressed: (isApproving || isRejecting) ? null : onApproveTap,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1BA8FF),
                           elevation: 0,
@@ -511,14 +624,25 @@ class _ApprovalSummaryBar extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Approve',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: isApproving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Approve',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],

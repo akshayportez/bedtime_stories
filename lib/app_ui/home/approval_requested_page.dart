@@ -99,57 +99,67 @@ class _ApprovalRequestedPageState extends State<ApprovalRequestedPage> {
               ),
               const SizedBox(height: 14),
               Expanded(
-                child: BlocBuilder<BedtimePaymentRequestBloc, BedtimePaymentRequestState>(
-                  builder: (context, state) {
-                    if (state is BedtimePaymentRequestLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                child:
+                    BlocBuilder<
+                      BedtimePaymentRequestBloc,
+                      BedtimePaymentRequestState
+                    >(
+                      builder: (context, state) {
+                        if (state is BedtimePaymentRequestLoading) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                    if (state is BedtimePaymentRequestFailure) {
-                      return Center(child: Text(state.message));
-                    }
+                        if (state is BedtimePaymentRequestFailure) {
+                          return Center(child: Text(state.message));
+                        }
 
-                    if (state is BedtimePaymentRequestLoaded) {
-                      final requestedItems = state.requests
-                          .where((r) => _isRequestedStatus(r.cStatus))
-                          .toList();
+                        if (state is BedtimePaymentRequestLoaded) {
+                          final requestedItems = state.requests
+                              .where((r) => _isRequestedStatus(r.cStatus))
+                              .toList();
 
-                      if (requestedItems.isEmpty) {
-                        return const Center(child: Text("No requests found"));
-                      }
+                          if (requestedItems.isEmpty) {
+                            return const Center(
+                              child: Text("No requests found"),
+                            );
+                          }
 
-                      return ListView.builder(
-                        itemCount: requestedItems.length,
-                        itemBuilder: (context, index) {
-                          final request = requestedItems[index];
-                          return GestureDetector(
-                            onTap: () async {
-                              final approved = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => RejectApprovePage(request: request),
+                          return ListView.builder(
+                            itemCount: requestedItems.length,
+                            itemBuilder: (context, index) {
+                              final request = requestedItems[index];
+                              return GestureDetector(
+                                onTap: () async {
+                                  final approved = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RejectApprovePage(request: request),
+                                    ),
+                                  );
+                                  if (approved == true) {
+                                    await _loadRequests();
+                                  }
+                                },
+                                child: _ApprovalRequestedCard(
+                                  reqNo: request.cRequestNo,
+                                  dateTime: request.cRequestDateTime ?? "",
+                                  requestedBy: request.cRequestedBy,
+                                  name: request.cAccountName,
+                                  category: request.cCategoryName,
+                                  section: request.cSectionName,
+                                  amount: _formatAmount(request.nPayableAmount),
                                 ),
                               );
-                              if (approved == true) {
-                                await _loadRequests();
-                              }
                             },
-                            child: _ApprovalRequestedCard(
-                              reqNo: request.cRequestNo,
-                              dateTime: request.cRequestDateTime ?? "",
-                              name: request.cAccountName,
-                              category: request.cCategoryName,
-                              section: request.cSectionName,
-                              amount: _formatAmount(request.nPayableAmount),
-                            ),
                           );
-                        },
-                      );
-                    }
+                        }
 
-                    return const SizedBox();
-                  },
-                ),
+                        return const SizedBox();
+                      },
+                    ),
               ),
             ],
           ),
@@ -205,6 +215,7 @@ class _ApprovalRequestedSearchBar extends StatelessWidget {
 class _ApprovalRequestedCard extends StatelessWidget {
   final String reqNo;
   final String dateTime;
+  final String requestedBy;
   final String name;
   final String category;
   final String section;
@@ -213,6 +224,7 @@ class _ApprovalRequestedCard extends StatelessWidget {
   const _ApprovalRequestedCard({
     required this.reqNo,
     required this.dateTime,
+    required this.requestedBy,
     required this.name,
     required this.category,
     required this.section,
@@ -252,6 +264,32 @@ class _ApprovalRequestedCard extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w300,
                         color: Color(0xFF3B3B3B),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Text(
+                      "Requested by : ",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF2C2C2C),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        requestedBy,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7F7F7F),
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ),
                   ],
