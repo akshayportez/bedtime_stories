@@ -68,6 +68,15 @@ class _HomeScreenState extends State<HomeScreen> {
             await _reloadApprovalList();
             return;
           }
+          if (selectedIndex == 2) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const VoucherApprovalRequestsPage(),
+              ),
+            );
+            return;
+          }
           Navigator.pushNamed(context, "/createRequestPage");
         },
         child: const Icon(Icons.add, size: 28, color: Colors.white),
