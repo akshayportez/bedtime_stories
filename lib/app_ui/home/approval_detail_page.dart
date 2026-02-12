@@ -10,6 +10,8 @@ class ApprovalDetailPage extends StatefulWidget {
 }
 
 class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
+  bool _showActionButtons = false;
+
   String _money(double value) => value.toStringAsFixed(2);
 
   @override
@@ -212,6 +214,12 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                             tax: _money(taxAmount),
                             payable: _money(payableAmount),
                             bottomPadding: bottomInset,
+                            showActionButtons: _showActionButtons,
+                            onEditTap: () {
+                              setState(() => _showActionButtons = true);
+                            },
+                            onRejectTap: () {},
+                            onApproveTap: () {},
                           ),
                         ],
                       );
@@ -393,6 +401,10 @@ class _ApprovalSummaryBar extends StatelessWidget {
   final String tax;
   final String payable;
   final double bottomPadding;
+  final bool showActionButtons;
+  final VoidCallback onEditTap;
+  final VoidCallback onRejectTap;
+  final VoidCallback onApproveTap;
 
   const _ApprovalSummaryBar({
     required this.requestedAmount,
@@ -400,6 +412,10 @@ class _ApprovalSummaryBar extends StatelessWidget {
     required this.tax,
     required this.payable,
     required this.bottomPadding,
+    required this.showActionButtons,
+    required this.onEditTap,
+    required this.onRejectTap,
+    required this.onApproveTap,
   });
 
   @override
@@ -439,20 +455,74 @@ class _ApprovalSummaryBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black),
-                  borderRadius: BorderRadius.circular(6),
+              if (!showActionButtons)
+                GestureDetector(
+                  onTap: onEditTap,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Image.asset(
+                      'assets/icons/edit_icon.png',
+                      width: 24,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: onRejectTap,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF4B4B),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Reject',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: onApproveTap,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1BA8FF),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Approve',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                child: Image.asset(
-                  'assets/icons/edit_icon.png',
-                  width: 24,
-                  fit: BoxFit.contain,
-                ),
-              ),
             ],
           ),
         ],
