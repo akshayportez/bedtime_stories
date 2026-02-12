@@ -1,6 +1,9 @@
 import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_bank_list_bloc/bedtime_get_bank_list_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_bank_list_bloc/bedtime_get_bank_list_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_bank_list_bloc/bedtime_get_bank_list_repository.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/add_account_bloc/bedtime_add_account_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/add_account_bloc/bedtime_add_account_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/add_account_bloc/bedtime_add_account_repository.dart';
@@ -62,6 +65,13 @@ Future<void> main() async {
       create: (_) => BedtimeGetAccountsListBloc(
         BedtimeGetAccountsListRepository(
           BedtimeGetAccountsListApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimeGetBankListBloc(
+        BedtimeGetBankListRepository(
+          BedtimeGetBankListApiProvider(),
         ),
       ),
     ),

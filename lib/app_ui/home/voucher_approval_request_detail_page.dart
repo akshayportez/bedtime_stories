@@ -15,8 +15,7 @@ class VoucherApprovalRequestDetailPage extends StatefulWidget {
 class _VoucherApprovalRequestDetailPageState
     extends State<VoucherApprovalRequestDetailPage> {
   _VoucherPaymentMode _paymentMode = _VoucherPaymentMode.cash;
-  final List<String> _bankOptions = const ["HDFC Bank", "ICICI Bank", "SBI"];
-  String? _selectedBank;
+  int? _selectedBankId;
   DateTime? _chequeDate;
   final TextEditingController _chequeNumberController = TextEditingController();
   final TextEditingController _transactionIdController = TextEditingController();
@@ -27,6 +26,9 @@ class _VoucherApprovalRequestDetailPageState
   @override
   void initState() {
     super.initState();
+    context.read<BedtimeGetBankListBloc>().add(
+      BedtimeGetBankListLoadRequested(companyId: 1),
+    );
     context.read<BedtimePaymentRequestDetailBloc>().add(
       BedtimePaymentRequestDetailLoadRequested(
         companyId: 1,
@@ -82,6 +84,16 @@ class _VoucherApprovalRequestDetailPageState
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
+    final bankListState = context.watch<BedtimeGetBankListBloc>().state;
+    final bankItems = bankListState is BedtimeGetBankListLoaded
+        ? bankListState.banks
+        : <BedtimeGetBankList>[];
+    final bankHint = bankListState is BedtimeGetBankListLoading
+        ? "Loading banks..."
+        : "Select Bank";
+    final bankError = bankListState is BedtimeGetBankListFailure
+        ? bankListState.message
+        : null;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -316,13 +328,23 @@ class _VoucherApprovalRequestDetailPageState
                                     _VoucherLabelText(label: "Bank Name"),
                                     const SizedBox(height: 6),
                                     _VoucherDropdownField(
-                                      value: _selectedBank,
-                                      hint: "Select Bank",
-                                      items: _bankOptions,
+                                      value: _selectedBankId,
+                                      hint: bankHint,
+                                      items: bankItems,
                                       onChanged: (value) {
-                                        setState(() => _selectedBank = value);
+                                        setState(() => _selectedBankId = value);
                                       },
                                     ),
+                                    if (bankError != null && bankItems.isEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        bankError,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFCC2B2B),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: 14),
                                   ],
                                   if (_paymentMode == _VoucherPaymentMode.cheque) ...[
@@ -345,13 +367,23 @@ class _VoucherApprovalRequestDetailPageState
                                     _VoucherLabelText(label: "Bank Name"),
                                     const SizedBox(height: 6),
                                     _VoucherDropdownField(
-                                      value: _selectedBank,
-                                      hint: "Select Bank",
-                                      items: _bankOptions,
+                                      value: _selectedBankId,
+                                      hint: bankHint,
+                                      items: bankItems,
                                       onChanged: (value) {
-                                        setState(() => _selectedBank = value);
+                                        setState(() => _selectedBankId = value);
                                       },
                                     ),
+                                    if (bankError != null && bankItems.isEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        bankError,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFCC2B2B),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: 14),
                                   ],
                                   if (_paymentMode == _VoucherPaymentMode.upi) ...[
@@ -509,17 +541,25 @@ class _VoucherTextField extends StatelessWidget {
       ),
       child: TextField(
         controller: controller,
-        decoration: InputDecoration.collapsed(hintText: hint),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          hintText: hint,
+          isDense: true,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
       ),
     );
   }
 }
 
 class _VoucherDropdownField extends StatelessWidget {
-  final String? value;
+  final int? value;
   final String hint;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
+  final List<BedtimeGetBankList> items;
+  final ValueChanged<int?> onChanged;
 
   const _VoucherDropdownField({
     required this.value,
@@ -539,9 +579,9 @@ class _VoucherDropdownField extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
+        child: DropdownButton<int>(
           isExpanded: true,
-          value: items.contains(value) ? value : null,
+          value: items.any((item) => item.nBankId == value) ? value : null,
           hint: Text(
             hint,
             style: const TextStyle(fontSize: 13, color: Color(0xFF7F7F7F)),
@@ -549,10 +589,10 @@ class _VoucherDropdownField extends StatelessWidget {
           icon: const Icon(Icons.chevron_right, size: 18),
           items: items
               .map(
-                (bank) => DropdownMenuItem<String>(
-                  value: bank,
+                (bank) => DropdownMenuItem<int>(
+                  value: bank.nBankId,
                   child: Text(
-                    bank,
+                    bank.cBankName,
                     style: const TextStyle(fontSize: 13, color: Colors.black),
                   ),
                 ),
