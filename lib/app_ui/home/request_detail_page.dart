@@ -488,7 +488,11 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                       ),
                                     ),
                                   for (final file in attachments) ...[
-                                    _UploadRow(title: file, size: ""),
+                                    _UploadRow(
+                                      title: file,
+                                      size: "Loading...",
+                                      enableImagePreview: true,
+                                    ),
                                     const SizedBox(height: 10),
                                   ],
                                   const SizedBox(height: 140),
@@ -853,50 +857,247 @@ class _TaxTable extends StatelessWidget {
 class _UploadRow extends StatelessWidget {
   final String title;
   final String size;
+  final bool enableImagePreview;
 
-  const _UploadRow({required this.title, required this.size});
+  const _UploadRow({
+    required this.title,
+    required this.size,
+    this.enableImagePreview = false,
+  });
+
+  String _imageUrl(String value) {
+    final path = value.trim();
+    if (path.isEmpty) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+    final base = BedtimeApiConstants.baseUrl.endsWith("/")
+        ? BedtimeApiConstants.baseUrl.substring(
+            0,
+            BedtimeApiConstants.baseUrl.length - 1,
+          )
+        : BedtimeApiConstants.baseUrl;
+    final normalizedPath = path.startsWith("/") ? path : "/$path";
+    return "$base$normalizedPath";
+  }
+
+  void _openImagePreview(BuildContext context, String imageUrl) {
+    if (!enableImagePreview || imageUrl.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (_, __, ___) {
+                      return const Center(
+                        child: Text(
+                          "Unable to load image",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return "-";
+    const units = ["B", "KB", "MB", "GB"];
+    double value = bytes.toDouble();
+    int unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+    final text = value >= 100 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+    return "$text ${units[unitIndex]}";
+  }
+
+  String _displayName(String raw) {
+    return raw.split('/').last.split('\\').last;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFA7DDFD)),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 6),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF2FF),
-              borderRadius: BorderRadius.circular(4),
+    final imageUrl = _imageUrl(title);
+    if (!enableImagePreview) {
+      return _RequestAttachmentTile(
+        title: _displayName(title),
+        imageUrl: imageUrl,
+        sizeText: size,
+        onTap: () => _openImagePreview(context, imageUrl),
+      );
+    }
+    return _RequestAttachmentTile(
+      title: _displayName(title),
+      imageUrl: imageUrl,
+      sizeText: size.trim().isEmpty ? "Loading..." : size,
+      onTap: () => _openImagePreview(context, imageUrl),
+      formatBytes: _formatBytes,
+    );
+  }
+}
+
+class _RequestAttachmentTile extends StatefulWidget {
+  final String title;
+  final String imageUrl;
+  final String sizeText;
+  final VoidCallback onTap;
+  final String Function(int bytes)? formatBytes;
+
+  const _RequestAttachmentTile({
+    required this.title,
+    required this.imageUrl,
+    required this.sizeText,
+    required this.onTap,
+    this.formatBytes,
+  });
+
+  @override
+  State<_RequestAttachmentTile> createState() => _RequestAttachmentTileState();
+}
+
+class _RequestAttachmentTileState extends State<_RequestAttachmentTile> {
+  String? _resolvedSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveSize();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RequestAttachmentTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _resolvedSize = null;
+      _resolveSize();
+    }
+  }
+
+  Future<void> _resolveSize() async {
+    if (widget.imageUrl.isEmpty || widget.formatBytes == null) return;
+    try {
+      final provider = NetworkImage(widget.imageUrl);
+      final stream = provider.resolve(const ImageConfiguration());
+      final completer = Completer<int>();
+      late final ImageStreamListener listener;
+      listener = ImageStreamListener(
+        (_, __) {},
+        onChunk: (chunk) {
+          if (!completer.isCompleted &&
+              chunk.expectedTotalBytes != null &&
+              chunk.expectedTotalBytes! > 0) {
+            completer.complete(chunk.expectedTotalBytes!);
+            stream.removeListener(listener);
+          }
+        },
+        onError: (_, __) {
+          if (!completer.isCompleted) completer.complete(0);
+          stream.removeListener(listener);
+        },
+      );
+      stream.addListener(listener);
+      final bytes = await completer.future.timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => 0,
+      );
+      if (!mounted || bytes <= 0) return;
+      setState(() {
+        _resolvedSize = widget.formatBytes!(bytes);
+      });
+    } catch (_) {
+      // Keep fallback text.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sizeText = (_resolvedSize ?? widget.sizeText).trim().isEmpty
+        ? "-"
+        : (_resolvedSize ?? widget.sizeText);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFA7DDFD)),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 6),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF2FF),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: widget.imageUrl.isEmpty
+                  ? const Icon(Icons.image, size: 20, color: Colors.black54)
+                  : Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return const Icon(
+                          Icons.image,
+                          size: 20,
+                          color: Colors.black54,
+                        );
+                      },
+                    ),
             ),
-            child: const Icon(Icons.image, size: 20, color: Colors.black54),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1F1F1F),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1F1F1F),
+                    ),
                   ),
-                ),
-                if (size.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    size,
+                    sizeText,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -906,11 +1107,11 @@ class _UploadRow extends StatelessWidget {
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-        ],
+            const SizedBox(width: 8),
+          ],
+        ),
       ),
     );
   }

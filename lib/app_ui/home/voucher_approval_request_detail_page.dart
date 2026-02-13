@@ -397,7 +397,11 @@ class _VoucherApprovalRequestDetailPageState
                                       ),
                                     ),
                                   for (final file in attachments) ...[
-                                    _UploadRow(title: file, size: "550KB"),
+                                    _UploadRow(
+                                      title: file,
+                                      size: "Loading...",
+                                      enableImagePreview: true,
+                                    ),
                                     const SizedBox(height: 8),
                                   ],
                                   const SizedBox(height: 10),
