@@ -13,6 +13,14 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   bool _showActionButtons = false;
   bool _isApproving = false;
   bool _isRejecting = false;
+  bool _showApprovedDetails = false;
+  bool _showRejectedDetails = false;
+  bool _showPaidDetails = false;
+
+  String get _status => widget.request.cStatus.trim().toLowerCase();
+  bool get _isApproved => _status == "approved";
+  bool get _isRejected => _status == "rejected";
+  bool get _isPaid => _status == "paid";
 
   String _money(double value) => value.toStringAsFixed(2);
   int _resolveInt(dynamic value, {int fallback = 0}) {
@@ -40,12 +48,35 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
         .toList();
   }
 
-  String _approvedBannerText() {
-    final approvedBy = widget.request.cApprovedBy ?? '';
-    final by = approvedBy.trim().isEmpty ? 'you' : approvedBy;
-    final on = (widget.request.cApprovedDateTime ?? '').trim();
-    if (on.isEmpty) return '(by $by)';
-    return '(by $by on $on)';
+  String _who(String? value) {
+    final text = (value ?? '').trim();
+    return text.isEmpty ? 'you' : text;
+  }
+
+  String _on(String? value) {
+    return (value ?? '').trim();
+  }
+
+  RichText _historyLine({
+    required String label,
+    required String by,
+    required String on,
+  }) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 12, color: Colors.black),
+        children: [
+          TextSpan(text: "$label "),
+          TextSpan(
+            text: "(by $by on $on)",
+            style: const TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Color(0xFF3C3C3C),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _onApproveTapped() async {
@@ -147,11 +178,82 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
         body: SafeArea(
           child: Column(
             children: [
-              _RequestDetailHeader(
+            _RequestDetailHeader(
                 title: 'Request',
                 onBack: () => Navigator.pop(context),
               ),
-              _StatusBanner(label: 'Approved', details: _approvedBannerText()),
+              if (_isApproved)
+                _ExpandableStatusBanner(
+                  label: 'Approved',
+                  details:
+                      '(by ${_who(request.cApprovedBy)} on ${_on(request.cApprovedDateTime)})',
+                  isExpanded: _showApprovedDetails,
+                  onTap: () {
+                    setState(() => _showApprovedDetails = !_showApprovedDetails);
+                  },
+                  expandedChild: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _historyLine(
+                        label: "Requested",
+                        by: "you",
+                        on: _on(request.cRequestDateTime),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_isRejected)
+                _ExpandableStatusBanner(
+                  label: 'Rejected',
+                  details:
+                      '(by ${_who(request.cRejectedBy)} on ${_on(request.cRejectedDateTime)})',
+                  isExpanded: _showRejectedDetails,
+                  onTap: () {
+                    setState(() => _showRejectedDetails = !_showRejectedDetails);
+                  },
+                  expandedChild: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _historyLine(
+                        label: "Requested",
+                        by: "you",
+                        on: _on(request.cRequestDateTime),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_isPaid)
+                _ExpandableStatusBanner(
+                  label: 'Paid',
+                  details:
+                      '(by ${_who(request.cPaidBy)} on ${_on(request.cVoucherDateTime)})',
+                  isExpanded: _showPaidDetails,
+                  onTap: () {
+                    setState(() => _showPaidDetails = !_showPaidDetails);
+                  },
+                  expandedChild: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _historyLine(
+                        label: "Approved",
+                        by: _who(request.cApprovedBy),
+                        on: _on(request.cApprovedDateTime),
+                      ),
+                      const SizedBox(height: 4),
+                      _historyLine(
+                        label: "Requested",
+                        by: "you",
+                        on: _on(request.cRequestDateTime),
+                      ),
+                    ],
+                  ),
+                ),
+              if (!(_isApproved || _isRejected || _isPaid))
+                _StatusBanner(
+                  label: 'Approved',
+                  details:
+                      '(by ${_who(request.cApprovedBy)} on ${_on(request.cApprovedDateTime)})',
+                ),
               Expanded(
                 child:
                     BlocBuilder<

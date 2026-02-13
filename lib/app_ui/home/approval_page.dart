@@ -342,7 +342,7 @@ class _ApprovalFilterBottomSheet extends StatefulWidget {
   final DateTime? initialFromDate;
   final DateTime? initialToDate;
   final void Function(DateTime? fromDate, DateTime? toDate, String status)
-      onApply;
+  onApply;
 
   const _ApprovalFilterBottomSheet({
     required this.initialStatus,
@@ -356,7 +356,8 @@ class _ApprovalFilterBottomSheet extends StatefulWidget {
       _ApprovalFilterBottomSheetState();
 }
 
-class _ApprovalFilterBottomSheetState extends State<_ApprovalFilterBottomSheet> {
+class _ApprovalFilterBottomSheetState
+    extends State<_ApprovalFilterBottomSheet> {
   DateTime? _fromDate;
   DateTime? _toDate;
   DateTime _activeDate = DateTime.now();
@@ -367,7 +368,8 @@ class _ApprovalFilterBottomSheetState extends State<_ApprovalFilterBottomSheet> 
     super.initState();
     _fromDate = widget.initialFromDate;
     _toDate = widget.initialToDate;
-    _activeDate = widget.initialToDate ?? widget.initialFromDate ?? DateTime.now();
+    _activeDate =
+        widget.initialToDate ?? widget.initialFromDate ?? DateTime.now();
     _selectedStatus = widget.initialStatus;
   }
 
@@ -540,7 +542,11 @@ class _ApprovalFilterBottomSheetState extends State<_ApprovalFilterBottomSheet> 
                     ),
                     onPressed: () {
                       final effectiveToDate = _toDate ?? _fromDate;
-                      widget.onApply(_fromDate, effectiveToDate, _selectedStatus);
+                      widget.onApply(
+                        _fromDate,
+                        effectiveToDate,
+                        _selectedStatus,
+                      );
                       Navigator.pop(context);
                     },
                     child: const Text(
@@ -606,7 +612,7 @@ class _ApprovalCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                       Expanded(
+                    Expanded(
                       child: Text(
                         status,
                         maxLines: 1,
@@ -618,13 +624,16 @@ class _ApprovalCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Text(
-                      requestDate,
+                      actionDate,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
                       style: const TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w300,
                         color: Color(0xFF3B3B3B),
+                        fontWeight: FontWeight.w300,
                       ),
                     ),
                   ],
@@ -646,14 +655,11 @@ class _ApprovalCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        actionDate,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
+                        requestDate,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF3B3B3B),
                           fontWeight: FontWeight.w300,
+                          color: Color(0xFF3B3B3B),
                         ),
                       ),
                     ),
@@ -715,7 +721,6 @@ class _ApprovalCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              
               ],
             ),
           ),
@@ -752,7 +757,6 @@ class _ApprovalCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              
               ],
             ),
           ),
