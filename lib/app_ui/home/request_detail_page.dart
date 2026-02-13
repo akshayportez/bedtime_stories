@@ -11,6 +11,9 @@ class RequestDetailPage extends StatefulWidget {
 
 class _RequestDetailPageState extends State<RequestDetailPage> {
   bool _isDeleting = false;
+  bool _showApprovedRequestDetails = false;
+  bool _showRejectedRequestDetails = false;
+  bool _showPaidRequestDetails = false;
 
   String get _status => widget.request.cStatus.trim();
 
@@ -216,17 +219,111 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
               onEdit: null,
             ),
 
-            if (_isApproved || _isPaid)
-              _StatusBanner(
+            if (_isApproved)
+              _ExpandableStatusBanner(
                 label: "Approved",
                 details:
-                    "(by ${request.cApprovedBy} on ${request.cApprovedDateTime ?? ""})",
+                    "(by ${request.cApprovedBy ?? ""} on ${request.cApprovedDateTime ?? ""})",
+                isExpanded: _showApprovedRequestDetails,
+                onTap: () {
+                  setState(() {
+                    _showApprovedRequestDetails = !_showApprovedRequestDetails;
+                  });
+                },
+                expandedChild: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 12, color: Colors.black),
+                    children: [
+                      const TextSpan(text: "Requested "),
+                      TextSpan(
+                        text:
+                            "(by you on ${request.cRequestDateTime ?? ""})",
+                        style: const TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Color(0xFF3C3C3C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_isPaid)
+              _ExpandableStatusBanner(
+                label: "Paid",
+                details:
+                    "(by ${(request.cPaidBy ?? "").trim().isEmpty ? "you" : request.cPaidBy} on ${request.cVoucherDateTime ?? ""})",
+                isExpanded: _showPaidRequestDetails,
+                onTap: () {
+                  setState(() {
+                    _showPaidRequestDetails = !_showPaidRequestDetails;
+                  });
+                },
+                expandedChild: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: Colors.black),
+                        children: [
+                          const TextSpan(text: "Approved "),
+                          TextSpan(
+                            text:
+                                "(by ${(request.cApprovedBy ?? "").trim().isEmpty ? "you" : request.cApprovedBy} on ${request.cApprovedDateTime ?? ""})",
+                            style: const TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF3C3C3C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: Colors.black),
+                        children: [
+                          const TextSpan(text: "Requested "),
+                          TextSpan(
+                            text:
+                                "(by you on ${request.cRequestDateTime ?? ""})",
+                            style: const TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF3C3C3C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             if (_isRejected)
-              _StatusBanner(
+              _ExpandableStatusBanner(
                 label: "Rejected",
                 details:
-                    "(by ${request.cRejectedBy} on ${request.cRejectedDateTime ?? ""})",
+                    "(by ${request.cRejectedBy ?? ""} on ${request.cRejectedDateTime ?? ""})",
+                isExpanded: _showRejectedRequestDetails,
+                onTap: () {
+                  setState(() {
+                    _showRejectedRequestDetails = !_showRejectedRequestDetails;
+                  });
+                },
+                expandedChild: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 12, color: Colors.black),
+                    children: [
+                      const TextSpan(text: "Requested "),
+                      TextSpan(
+                        text:
+                            "(by you on ${request.cRequestDateTime ?? ""})",
+                        style: const TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Color(0xFF3C3C3C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
             Expanded(
@@ -277,27 +374,28 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        "Req No : ${request.cRequestNo}",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                          color: Color(0xFF333333),
+                                  if (!(_isApproved || _isRejected || _isPaid))
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "Req No : ${request.cRequestNo}",
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Color(0xFF333333),
+                                          ),
                                         ),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        request.cRequestDateTime ?? "",
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF242424),
+                                        const Spacer(),
+                                        Text(
+                                          request.cRequestDateTime ?? "",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF242424),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
                                   const SizedBox(height: 14),
                                   _DetailField(
                                     label: "Account",
@@ -506,6 +604,75 @@ class _StatusBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ExpandableStatusBanner extends StatelessWidget {
+  final String label;
+  final String details;
+  final bool isExpanded;
+  final VoidCallback onTap;
+  final Widget expandedChild;
+
+  const _ExpandableStatusBanner({
+    required this.label,
+    required this.details,
+    required this.isExpanded,
+    required this.onTap,
+    required this.expandedChild,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFE5F2FE),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: Colors.black),
+                        children: [
+                          TextSpan(text: "$label "),
+                          TextSpan(
+                            text: details,
+                            style: const TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF3C3C3C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: const Color(0xFF3C3C3C),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: expandedChild,
+            ),
+        ],
       ),
     );
   }
