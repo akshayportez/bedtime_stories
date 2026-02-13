@@ -54,33 +54,26 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       /// Floating Action Button
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: appPrimaryColor,
-        shape: const CircleBorder(),
-        onPressed: () async {
-          if (selectedIndex == 1) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const ApprovalRequestedPage(),
-              ),
-            );
-            await _reloadApprovalList();
-            return;
-          }
-          if (selectedIndex == 2) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const VoucherApprovalRequestsPage(),
-              ),
-            );
-            return;
-          }
-          Navigator.pushNamed(context, "/createRequestPage");
-        },
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
-      ),
+      floatingActionButton: selectedIndex == 3
+          ? null
+          : FloatingActionButton(
+              backgroundColor: appPrimaryColor,
+              shape: const CircleBorder(),
+              onPressed: () async {
+                if (selectedIndex == 1) {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ApprovalRequestedPage(),
+                    ),
+                  );
+                  await _reloadApprovalList();
+                  return;
+                }
+                Navigator.pushNamed(context, "/createRequestPage");
+              },
+              child: const Icon(Icons.add, size: 28, color: Colors.white),
+            ),
 
       /// Bottom Navigation
       bottomNavigationBar: Padding(

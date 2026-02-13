@@ -138,6 +138,7 @@ class _PaymentRequestReportSheet extends StatefulWidget {
 }
 
 class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> {
+  int? _selectedProjectId;
   int? _selectedAccountId;
   int? _selectedCategoryId;
   int? _selectedSectionId;
@@ -157,6 +158,9 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
   void initState() {
     super.initState();
     _loadProjectName();
+    context.read<BedtimeProjectBloc>().add(
+      BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+    );
     context.read<BedtimeGetAccountsListBloc>().add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
     );
@@ -170,9 +174,11 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
 
   Future<void> _loadProjectName() async {
     final name = await BedtimeLocalStorage.getSelectedProjectName();
+    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
     if (!mounted) return;
     setState(() {
       _projectName = name;
+      _selectedProjectId = projectId == 0 ? null : projectId;
     });
   }
 
@@ -213,6 +219,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
     final accountState = context.watch<BedtimeGetAccountsListBloc>().state;
     final categoryState = context.watch<BedtimeGetCategoryListBloc>().state;
     final sectionState = context.watch<BedtimeGetSectionListBloc>().state;
+    final projectState = context.watch<BedtimeProjectBloc>().state;
 
     final accounts = accountState is BedtimeGetAccountsListLoaded
         ? accountState.accounts
@@ -223,6 +230,9 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
     final sections = sectionState is BedtimeGetSectionListLoaded
         ? sectionState.sections
         : <BedtimeGetSectionList>[];
+    final projects = projectState is BedtimeProjectLoaded
+        ? projectState.projects
+        : <BedtimeProject>[];
 
     return FractionallySizedBox(
       heightFactor: 0.9,
@@ -263,7 +273,48 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
               const SizedBox(height: 4),
               _ReportDropdownField(
                 hint: _projectName.isEmpty ? "Project" : _projectName,
-                child: const SizedBox.shrink(),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: projects.any((e) => e.nProjectId == _selectedProjectId)
+                        ? _selectedProjectId
+                        : null,
+                    hint: Text(
+                      _projectName.isEmpty ? "Project" : _projectName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF7F7F7F),
+                      ),
+                    ),
+                    icon: const Icon(Icons.chevron_right, size: 18),
+                    items: projects
+                        .map(
+                          (item) => DropdownMenuItem<int>(
+                            value: item.nProjectId,
+                            child: Text(
+                              item.cProjectName,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) async {
+                      if (v == null || projects.isEmpty) return;
+                      final selected = projects.firstWhere(
+                        (e) => e.nProjectId == v,
+                        orElse: () => projects.first,
+                      );
+                      setState(() {
+                        _selectedProjectId = v;
+                        _projectName = selected.cProjectName;
+                      });
+                      await BedtimeLocalStorage.saveSelectedProject(
+                        projectId: selected.nProjectId,
+                        projectName: selected.cProjectName,
+                      );
+                    },
+                  ),
+                ),
               ),
               const SizedBox(height: 10),
               Container(
@@ -469,7 +520,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
-                  width: 70,
+                  width: 100,
                   height: 40,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -651,6 +702,7 @@ class _VoucherReportSheet extends StatefulWidget {
 }
 
 class _VoucherReportSheetState extends State<_VoucherReportSheet> {
+  int? _selectedProjectId;
   int? _selectedAccountId;
   int? _selectedCategoryId;
   int? _selectedSectionId;
@@ -669,6 +721,9 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
   void initState() {
     super.initState();
     _loadProjectName();
+    context.read<BedtimeProjectBloc>().add(
+      BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+    );
     context.read<BedtimeGetAccountsListBloc>().add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
     );
@@ -682,9 +737,11 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
 
   Future<void> _loadProjectName() async {
     final name = await BedtimeLocalStorage.getSelectedProjectName();
+    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
     if (!mounted) return;
     setState(() {
       _projectName = name;
+      _selectedProjectId = projectId == 0 ? null : projectId;
     });
   }
 
@@ -725,6 +782,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
     final accountState = context.watch<BedtimeGetAccountsListBloc>().state;
     final categoryState = context.watch<BedtimeGetCategoryListBloc>().state;
     final sectionState = context.watch<BedtimeGetSectionListBloc>().state;
+    final projectState = context.watch<BedtimeProjectBloc>().state;
 
     final accounts = accountState is BedtimeGetAccountsListLoaded
         ? accountState.accounts
@@ -735,6 +793,9 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
     final sections = sectionState is BedtimeGetSectionListLoaded
         ? sectionState.sections
         : <BedtimeGetSectionList>[];
+    final projects = projectState is BedtimeProjectLoaded
+        ? projectState.projects
+        : <BedtimeProject>[];
 
     return FractionallySizedBox(
       heightFactor: 0.88,
@@ -775,7 +836,48 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
               const SizedBox(height: 4),
               _ReportDropdownField(
                 hint: _projectName.isEmpty ? "Project" : _projectName,
-                child: const SizedBox.shrink(),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: projects.any((e) => e.nProjectId == _selectedProjectId)
+                        ? _selectedProjectId
+                        : null,
+                    hint: Text(
+                      _projectName.isEmpty ? "Project" : _projectName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF7F7F7F),
+                      ),
+                    ),
+                    icon: const Icon(Icons.chevron_right, size: 18),
+                    items: projects
+                        .map(
+                          (item) => DropdownMenuItem<int>(
+                            value: item.nProjectId,
+                            child: Text(
+                              item.cProjectName,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) async {
+                      if (v == null || projects.isEmpty) return;
+                      final selected = projects.firstWhere(
+                        (e) => e.nProjectId == v,
+                        orElse: () => projects.first,
+                      );
+                      setState(() {
+                        _selectedProjectId = v;
+                        _projectName = selected.cProjectName;
+                      });
+                      await BedtimeLocalStorage.saveSelectedProject(
+                        projectId: selected.nProjectId,
+                        projectName: selected.cProjectName,
+                      );
+                    },
+                  ),
+                ),
               ),
               const SizedBox(height: 10),
               Row(
@@ -935,7 +1037,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
-                  width: 70,
+                  width: 100,
                   height: 40,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
