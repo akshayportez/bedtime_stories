@@ -10,6 +10,8 @@ class VoucherViewPage extends StatefulWidget {
 }
 
 class _VoucherViewPageState extends State<VoucherViewPage> {
+  bool _showPaidDetails = false;
+
   String _money(double value) => value.toStringAsFixed(2);
 
   @override
@@ -36,10 +38,18 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
         .toList();
   }
 
+  String _who(String? value) {
+    final text = (value ?? '').trim();
+    return text.isEmpty ? 'you' : text;
+  }
+
+  String _on(String? value) {
+    return (value ?? '').trim();
+  }
+
   String _paidBannerText() {
-    final approvedBy = widget.request.cApprovedBy ?? '';
-    final by = approvedBy.trim().isEmpty ? 'you' : approvedBy;
-    final on = (widget.request.cVoucherDateTime ?? '').trim();
+    final by = _who(widget.request.cPaidBy);
+    final on = _on(widget.request.cVoucherDateTime);
     if (on.isEmpty) return '(by $by)';
     return '(by $by on $on)';
   }
@@ -85,7 +95,63 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
               title: 'Voucher',
               onBack: () => Navigator.pop(context),
             ),
-            _StatusBanner(label: 'Paid', details: _paidBannerText()),
+            _ExpandableStatusBanner(
+              label: 'Paid',
+              details: _paidBannerText(),
+              isExpanded: _showPaidDetails,
+              onTap: () {
+                setState(() {
+                  _showPaidDetails = !_showPaidDetails;
+                });
+              },
+              expandedChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 12, color: Colors.black),
+                      children: [
+                        const TextSpan(text: 'Approved '),
+                        TextSpan(
+                          text:
+                              '(by ${_who(request.cApprovedBy)} on ${_on(request.cApprovedDateTime)})',
+                          style: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF3C3C3C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 12, color: Colors.black),
+                      children: [
+                        const TextSpan(text: 'Requested '),
+                        TextSpan(
+                          text:
+                              '(by ${_who(request.cRequestedBy)} on ${_on(request.cRequestDateTime)})',
+                          style: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF3C3C3C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Req No : ${request.cRequestNo}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child:
                   BlocBuilder<
