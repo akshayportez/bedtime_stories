@@ -1329,6 +1329,10 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
   void initState() {
     super.initState();
     _filters = widget.initialFilters;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadPaymentRequestReport();
+    });
   }
 
   @override
@@ -1349,6 +1353,52 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
     return "${_formatDate(_filters.fromDate!)} - ${_formatDate(_filters.toDate!)}";
   }
 
+  String _formatApiDate(DateTime? date) {
+    if (date == null) return "";
+    final y = date.year.toString().padLeft(4, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final d = date.day.toString().padLeft(2, "0");
+    return "$y-$m-$d";
+  }
+
+  String _idString(int? id) {
+    if (id == null || id == 0) return "";
+    return id.toString();
+  }
+
+  String _userIdString(String? userValue) {
+    if (userValue == null || userValue.trim().isEmpty) return "";
+    final parsed = int.tryParse(userValue.trim());
+    return parsed?.toString() ?? "";
+  }
+
+  String _statusApiValue(String status) {
+    final normalized = status.trim().toLowerCase();
+    if (normalized == "all") return "ALL";
+    if (normalized == "approved") return "Approved";
+    if (normalized == "rejected") return "Rejected";
+    return status;
+  }
+
+  String _money(double value) => value.toStringAsFixed(2);
+
+  void _loadPaymentRequestReport([PaymentRequestReportFilters? sourceFilters]) {
+    final selected = sourceFilters ?? _filters;
+    context.read<BedtimePaymentRequestReportBloc>().add(
+          BedtimePaymentRequestReportLoadRequested(
+            companyId: 1,
+            projectIds: _idString(selected.projectId),
+            status: _statusApiValue(selected.status),
+            dFrom: _formatApiDate(selected.fromDate),
+            dTo: _formatApiDate(selected.toDate),
+            accountIds: _idString(selected.accountId),
+            categoryIds: _idString(selected.categoryId),
+            sectionIds: _idString(selected.sectionId),
+            userIds: _userIdString(selected.user),
+          ),
+        );
+  }
+
   Future<void> _openFilterSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1358,6 +1408,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
         initialFilters: _filters,
         onApply: (filters) {
           setState(() => _filters = filters);
+          _loadPaymentRequestReport(filters);
         },
       ),
     );
@@ -1371,25 +1422,6 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
     );
-  }
-
-  List<Map<String, String>> _rows() {
-    return [
-      {
-        "Srl": "1",
-        "Req No": "REQ001",
-        "Date": "22 Jan 2025",
-        "User": "User 1",
-        "Account": "Mammon",
-        "Category": "Travel",
-        "Section": "Cash",
-        "Status": _filters.status == "All" ? "Approved" : _filters.status,
-        "Req Amount": "\u20B9460000.00",
-        "TDS": "100",
-        "Tax": "1000",
-        "Payable Amount": "\u20B9450000.00",
-      },
-    ];
   }
 
   @override
@@ -1411,7 +1443,14 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
     ];
 
     final applied = _showAllFilters ? appliedAll : appliedPrimary;
-    final rows = _rows();
+    final reportState = context.watch<BedtimePaymentRequestReportBloc>().state;
+    final rows = reportState is BedtimePaymentRequestReportLoaded
+        ? reportState.rows
+        : <BedtimePaymentRequestReportRow>[];
+    final totalTds = rows.fold<double>(0.0, (sum, row) => sum + row.nTDS);
+    final totalTax = rows.fold<double>(0.0, (sum, row) => sum + row.nTax);
+    final totalPayable =
+        rows.fold<double>(0.0, (sum, row) => sum + row.nPayable);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1484,73 +1523,40 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
                 border: Border.all(color: const Color(0xFFE2E6EE)),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 50,
-                          child: Column(
-                            children: [
-                              const _TableHeaderCell(label: "Srl", width: 50),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: rows.length,
-                                  itemBuilder: (context, index) {
-                                    return _TableBodyCell(
-                                      value: rows[index]["Srl"] ?? "",
-                                      width: 50,
-                                      align: TextAlign.center,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            controller: _horizontalController,
-                            scrollDirection: Axis.horizontal,
-                            child: SizedBox(
-                              width: scrollableColumnsWidth,
+              child: Builder(
+                builder: (context) {
+                  if (reportState is BedtimePaymentRequestReportLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (reportState is BedtimePaymentRequestReportFailure) {
+                    return Center(child: Text(reportState.message));
+                  }
+
+                  if (rows.isEmpty) {
+                    return const Center(
+                      child: Text("No payment request report found"),
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 50,
                               child: Column(
                                 children: [
-                                  Row(
-                                    children: const [
-                                      _TableHeaderCell(label: "Req No", width: 95),
-                                      _TableHeaderCell(label: "Date", width: 90),
-                                      _TableHeaderCell(label: "User", width: 90),
-                                      _TableHeaderCell(label: "Account", width: 120),
-                                      _TableHeaderCell(label: "Category", width: 110),
-                                      _TableHeaderCell(label: "Section", width: 90),
-                                      _TableHeaderCell(label: "Status", width: 90),
-                                      _TableHeaderCell(label: "Req Amount", width: 120),
-                                      _TableHeaderCell(label: "TDS", width: 70),
-                                      _TableHeaderCell(label: "Tax", width: 70),
-                                      _TableHeaderCell(label: "Payable Amount", width: 140),
-                                    ],
-                                  ),
+                                  const _TableHeaderCell(label: "Srl", width: 50),
                                   Expanded(
                                     child: ListView.builder(
                                       itemCount: rows.length,
                                       itemBuilder: (context, index) {
-                                        final row = rows[index];
-                                        return Row(
-                                          children: [
-                                            _TableBodyCell(value: row["Req No"] ?? "", width: 95),
-                                            _TableBodyCell(value: row["Date"] ?? "", width: 90),
-                                            _TableBodyCell(value: row["User"] ?? "", width: 90),
-                                            _TableBodyCell(value: row["Account"] ?? "", width: 120),
-                                            _TableBodyCell(value: row["Category"] ?? "", width: 110),
-                                            _TableBodyCell(value: row["Section"] ?? "", width: 90),
-                                            _TableBodyCell(value: row["Status"] ?? "", width: 90),
-                                            _TableBodyCell(value: row["Req Amount"] ?? "", width: 120),
-                                            _TableBodyCell(value: row["TDS"] ?? "", width: 70),
-                                            _TableBodyCell(value: row["Tax"] ?? "", width: 70),
-                                            _TableBodyCell(value: row["Payable Amount"] ?? "", width: 140),
-                                          ],
+                                        return _TableBodyCell(
+                                          value: "${index + 1}",
+                                          width: 50,
+                                          align: TextAlign.center,
                                         );
                                       },
                                     ),
@@ -1558,58 +1564,150 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
                                 ],
                               ),
                             ),
-                          ),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                controller: _horizontalController,
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: scrollableColumnsWidth,
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        children: const [
+                                          _TableHeaderCell(label: "Req No", width: 95),
+                                          _TableHeaderCell(label: "Date", width: 90),
+                                          _TableHeaderCell(label: "User", width: 90),
+                                          _TableHeaderCell(label: "Account", width: 120),
+                                          _TableHeaderCell(label: "Category", width: 110),
+                                          _TableHeaderCell(label: "Section", width: 90),
+                                          _TableHeaderCell(label: "Status", width: 90),
+                                          _TableHeaderCell(label: "Req Amount", width: 120),
+                                          _TableHeaderCell(label: "TDS", width: 70),
+                                          _TableHeaderCell(label: "Tax", width: 70),
+                                          _TableHeaderCell(
+                                            label: "Payable Amount",
+                                            width: 140,
+                                          ),
+                                        ],
+                                      ),
+                                      Expanded(
+                                        child: ListView.builder(
+                                          itemCount: rows.length,
+                                          itemBuilder: (context, index) {
+                                            final row = rows[index];
+                                            return Row(
+                                              children: [
+                                                _TableBodyCell(
+                                                  value: row.cRequestNo,
+                                                  width: 95,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.dDate,
+                                                  width: 90,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.cUserName,
+                                                  width: 90,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.cAccountName,
+                                                  width: 120,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.cCategoryName,
+                                                  width: 110,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.cSectionName,
+                                                  width: 90,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: row.cStatus,
+                                                  width: 90,
+                                                ),
+                                                _TableBodyCell(
+                                                  value:
+                                                      "${String.fromCharCode(8377)}${_money(row.nReqAmount)}",
+                                                  width: 120,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: _money(row.nTDS),
+                                                  width: 70,
+                                                ),
+                                                _TableBodyCell(
+                                                  value: _money(row.nTax),
+                                                  width: 70,
+                                                ),
+                                                _TableBodyCell(
+                                                  value:
+                                                      "${String.fromCharCode(8377)}${_money(row.nPayable)}",
+                                                  width: 140,
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF7F9FC),
-                      border: Border(top: BorderSide(color: Color(0xFFE2E6EE))),
-                    ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            "Swipe Horizontally for All Columns",
-                            style: TextStyle(fontSize: 11, color: Color(0xFF6D6D6D)),
-                          ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF7F9FC),
+                          border: Border(top: BorderSide(color: Color(0xFFE2E6EE))),
                         ),
-                        Container(
-                          width: 24,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFCDD6E2)),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            iconSize: 14,
-                            onPressed: () => _scrollHorizontally(-120),
-                            icon: const Icon(Icons.chevron_left),
-                          ),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                "Swipe Horizontally for All Columns",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF6D6D6D),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 24,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: const Color(0xFFCDD6E2)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                iconSize: 14,
+                                onPressed: () => _scrollHorizontally(-120),
+                                icon: const Icon(Icons.chevron_left),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 24,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: const Color(0xFFCDD6E2)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                iconSize: 14,
+                                onPressed: () => _scrollHorizontally(120),
+                                icon: const Icon(Icons.chevron_right),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 24,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFCDD6E2)),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            iconSize: 14,
-                            onPressed: () => _scrollHorizontally(120),
-                            icon: const Icon(Icons.chevron_right),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -1622,31 +1720,37 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: const [
+              children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "TDS : 100",
-                      style: TextStyle(fontSize: 12, color: Color(0xFF2D2D2D)),
+                      "TDS : ${_money(totalTds)}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF2D2D2D),
+                      ),
                     ),
                     Text(
-                      "Tax : 1000",
-                      style: TextStyle(fontSize: 12, color: Color(0xFF2D2D2D)),
+                      "Tax : ${_money(totalTax)}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF2D2D2D),
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
+                    const Text(
                       "Payable Amt : ",
                       style: TextStyle(fontSize: 12, color: Color(0xFF2D2D2D)),
                     ),
                     Text(
-                      "\u20B9450000.00",
-                      style: TextStyle(
+                      "${String.fromCharCode(8377)}${_money(totalPayable)}",
+                      style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF00A32A),
                         fontWeight: FontWeight.w700,

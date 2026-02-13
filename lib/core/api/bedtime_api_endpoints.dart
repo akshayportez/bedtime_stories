@@ -7,6 +7,7 @@ class BedtimeApiEndpoints {
   static const String categoryList = "/Category";
   static const String sectionList = "/Section";
   static const String paymentRequest = "/PaymentRequest";
+  static const String paymentRequestReportGet = "/PaymentRequestReport/get";
   static const String paymentRequestUpload = "/PaymentRequest/upload";
   static const String paymentRequestSave = "/PaymentRequest/save";
   static const String paymentVoucherSave = "/PaymentVoucher/save";
