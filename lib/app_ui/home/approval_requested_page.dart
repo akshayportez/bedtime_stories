@@ -193,10 +193,14 @@ class _ApprovalRequestedSearchBar extends StatelessWidget {
             fontWeight: FontWeight.w300,
             color: Color(0xFF5F5F5F),
           ),
-          prefixIcon: const Icon(
-            Icons.search,
-            size: 20,
-            color: Color(0xFF5F5F5F),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(12),
+            child: SvgPicture.asset(
+              "assets/icons/search_icon.svg",
+              width: 14,
+              height: 14,
+              fit: BoxFit.contain,
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(50),
