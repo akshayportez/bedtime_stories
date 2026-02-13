@@ -22,6 +22,9 @@ import 'package:bedtime_stories/app_ui/home/bloc/project_selection_bloc/bedtime_
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_bloc/bedtime_payment_request_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_bloc/bedtime_payment_request_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_bloc/bedtime_payment_request_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_bloc/bedtime_payment_voucher_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_bloc/bedtime_payment_voucher_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_bloc/bedtime_payment_voucher_repository.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_upload_bloc/bedtime_payment_request_upload_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_upload_bloc/bedtime_payment_request_upload_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_upload_bloc/bedtime_payment_request_upload_repository.dart';
@@ -119,6 +122,13 @@ Future<void> main() async {
       create: (_) => BedtimePaymentRequestBloc(
         BedtimePaymentRequestRepository(
           BedtimePaymentRequestApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimePaymentVoucherBloc(
+        BedtimePaymentVoucherRepository(
+          BedtimePaymentVoucherApiProvider(),
         ),
       ),
     ),

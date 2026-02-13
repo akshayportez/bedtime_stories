@@ -9,7 +9,7 @@ class VoucherPage extends StatefulWidget {
 
 class _VoucherPageState extends State<VoucherPage> with RouteAware {
   final TextEditingController _searchController = TextEditingController();
-  late final BedtimePaymentRequestBloc _voucherBloc;
+  late final BedtimePaymentVoucherBloc _voucherBloc;
   bool _isRouteObserverSubscribed = false;
   int _projectId = 0;
   int _userActionId = 0;
@@ -19,8 +19,8 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _voucherBloc = BedtimePaymentRequestBloc(
-      context.read<BedtimePaymentRequestBloc>().repository,
+    _voucherBloc = BedtimePaymentVoucherBloc(
+      context.read<BedtimePaymentVoucherBloc>().repository,
     );
     _loadVouchers();
   }
@@ -63,12 +63,12 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     if (!mounted) return;
 
     _voucherBloc.add(
-      BedtimePaymentRequestLoadRequested(
+      BedtimePaymentVoucherLoadRequested(
         companyId: 1,
         projectId: projectId,
         userActionId: _userActionId,
         search: "",
-        statusFilter: "Paid",
+        statusFilter: "",
         dFrom: _dFrom,
         dTo: _dTo,
       ),
@@ -102,12 +102,12 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
             : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
         _userActionId = resolvedUserId;
         _voucherBloc.add(
-          BedtimePaymentRequestSearchRequested(
+          BedtimePaymentVoucherSearchRequested(
             companyId: 1,
             projectId: _projectId,
             userActionId: _userActionId,
             search: value.trim(),
-            statusFilter: "Paid",
+            statusFilter: "",
             dFrom: _dFrom,
             dTo: _dTo,
           ),
@@ -117,12 +117,12 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     }
 
     _voucherBloc.add(
-      BedtimePaymentRequestSearchRequested(
+      BedtimePaymentVoucherSearchRequested(
         companyId: 1,
         projectId: _projectId,
         userActionId: _userActionId,
         search: value.trim(),
-        statusFilter: "Paid",
+        statusFilter: "",
         dFrom: _dFrom,
         dTo: _dTo,
       ),
@@ -165,6 +165,35 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   bool _isPaid(String status) => status.trim().toLowerCase() == "paid";
 
   String _formatAmount(double amount) => amount.toStringAsFixed(2);
+
+  BedtimePaymentRequest _toPaymentRequest(BedtimePaymentVoucher voucher) {
+    return BedtimePaymentRequest(
+      nPayReqId: voucher.nPayReqId,
+      cRequestNo: voucher.cRequestNo,
+      cVoucherNo: voucher.cVoucherNo,
+      dRequestDateTime: voucher.dRequestDateTime,
+      cRequestDateTime: voucher.cRequestDateTime,
+      nRequestedBy: voucher.nRequestedBy,
+      cRequestedBy: voucher.cRequestedBy,
+      dRejectedDateTime: voucher.dRejectedDateTime,
+      cRejectedDateTime: voucher.cRejectedDateTime,
+      cRejectedBy: voucher.cRejectedBy,
+      dApprovedDateTime: voucher.dApprovedDate,
+      cApprovedDateTime: voucher.cApprovedDate,
+      cApprovedBy: voucher.cApprovedBy,
+      dVoucherDateTime: voucher.dVoucherDate,
+      cVoucherDateTime: voucher.cVoucherDate,
+      cPaidBy: voucher.cPaidBy,
+      nAccountId: 0,
+      cAccountName: voucher.cAccountName,
+      nCategoryId: 0,
+      cCategoryName: voucher.cCategoryName,
+      nSectionId: 0,
+      cSectionName: voucher.cSectionName,
+      nPayableAmount: voucher.nPayableAmount,
+      cStatus: voucher.cStatus,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -218,19 +247,23 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
             ),
             const SizedBox(height: 14),
             Expanded(
-              child: BlocBuilder<BedtimePaymentRequestBloc, BedtimePaymentRequestState>(
+              child: BlocBuilder<
+                BedtimePaymentVoucherBloc,
+                BedtimePaymentVoucherState
+              >(
                 bloc: _voucherBloc,
                 builder: (context, state) {
-                  if (state is BedtimePaymentRequestLoading) {
+                  if (state is BedtimePaymentVoucherLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (state is BedtimePaymentRequestFailure) {
+                  if (state is BedtimePaymentVoucherFailure) {
                     return Center(child: Text(state.message));
                   }
 
-                  if (state is BedtimePaymentRequestLoaded) {
-                    final vouchers = state.requests.where((r) => _isPaid(r.cStatus)).toList();
+                  if (state is BedtimePaymentVoucherLoaded) {
+                    final vouchers =
+                        state.vouchers.where((v) => _isPaid(v.cStatus)).toList();
                     if (vouchers.isEmpty) {
                       return const Center(child: Text("No vouchers found"));
                     }
@@ -241,16 +274,20 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
                       itemCount: vouchers.length,
                       itemBuilder: (context, index) {
                         final voucher = vouchers[index];
+                        final request = _toPaymentRequest(voucher);
                         return _VoucherCard(
-                          request: voucher,
-                          voucherNo: (voucher.cVoucherNo ?? "").isEmpty
+                          request: request,
+                          voucherNo: voucher.cVoucherNo.isEmpty
                               ? voucher.cRequestNo
-                              : (voucher.cVoucherNo ?? ""),
-                          dateTime: voucher.cVoucherDateTime ?? voucher.cRequestDateTime ?? "",
+                              : voucher.cVoucherNo,
+                          dateTime: voucher.cVoucherDate.isNotEmpty
+                              ? voucher.cVoucherDate
+                              : (voucher.cRequestDateTime ?? ""),
                           name: voucher.cAccountName,
                           category: voucher.cCategoryName,
                           section: voucher.cSectionName,
                           amount: _formatAmount(voucher.nPayableAmount),
+                          payMode: voucher.cPaymode,
                         );
                       },
                     );
@@ -275,6 +312,7 @@ class _VoucherCard extends StatelessWidget {
   final String category;
   final String section;
   final String amount;
+  final String payMode;
 
   const _VoucherCard({
     required this.request,
@@ -284,6 +322,7 @@ class _VoucherCard extends StatelessWidget {
     required this.category,
     required this.section,
     required this.amount,
+    required this.payMode,
   });
 
   @override
@@ -443,9 +482,9 @@ class _VoucherCard extends StatelessWidget {
                       color: const Color(0xFFD8DDEA),
                       borderRadius: BorderRadius.circular(50),
                     ),
-                    child: const Text(
-                      "Cheque",
-                      style: TextStyle(
+                    child: Text(
+                      payMode.trim().isEmpty ? "-" : payMode,
+                      style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF6A7388),
                         fontWeight: FontWeight.w500,
