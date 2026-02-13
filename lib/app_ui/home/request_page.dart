@@ -141,16 +141,16 @@ class _RequestPageState extends State<RequestPage> {
       builder: (context) {
         return _RequestFilterBottomSheet(
           initialStatus: _statusFilter,
-          initialDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
-          onApply: (selectedDate, status) async {
+          initialFromDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
+          initialToDate: _dTo.isEmpty ? null : DateTime.tryParse(_dTo),
+          onApply: (fromDate, toDate, status) async {
             _statusFilter = status;
-            if (selectedDate == null) {
+            if (fromDate == null && toDate == null) {
               _dFrom = "";
               _dTo = "";
             } else {
-              final formatted = _formatDate(selectedDate);
-              _dFrom = formatted;
-              _dTo = formatted;
+              _dFrom = fromDate == null ? "" : _formatDate(fromDate);
+              _dTo = toDate == null ? "" : _formatDate(toDate);
             }
             if (mounted) setState(() {});
             await _loadRequests();
@@ -559,12 +559,15 @@ class _BottomSheetProjectTile extends StatelessWidget {
 
 class _RequestFilterBottomSheet extends StatefulWidget {
   final String initialStatus;
-  final DateTime? initialDate;
-  final void Function(DateTime? selectedDate, String status) onApply;
+  final DateTime? initialFromDate;
+  final DateTime? initialToDate;
+  final void Function(DateTime? fromDate, DateTime? toDate, String status)
+      onApply;
 
   const _RequestFilterBottomSheet({
     required this.initialStatus,
-    required this.initialDate,
+    required this.initialFromDate,
+    required this.initialToDate,
     required this.onApply,
   });
 
@@ -574,14 +577,45 @@ class _RequestFilterBottomSheet extends StatefulWidget {
 }
 
 class _RequestFilterBottomSheetState extends State<_RequestFilterBottomSheet> {
-  DateTime? _selectedDate;
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  DateTime _activeDate = DateTime.now();
   String _selectedStatus = "";
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.initialDate;
+    _fromDate = widget.initialFromDate;
+    _toDate = widget.initialToDate;
+    _activeDate = widget.initialToDate ??
+        widget.initialFromDate ??
+        DateTime.now();
     _selectedStatus = widget.initialStatus;
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final d = date.day.toString().padLeft(2, "0");
+    return "$y-$m-$d";
+  }
+
+  void _onCalendarDateChanged(DateTime date) {
+    setState(() {
+      _activeDate = date;
+      if (_fromDate == null || _toDate != null) {
+        _fromDate = date;
+        _toDate = null;
+        return;
+      }
+
+      if (date.isBefore(_fromDate!)) {
+        _toDate = _fromDate;
+        _fromDate = date;
+      } else {
+        _toDate = date;
+      }
+    });
   }
 
   @override
@@ -638,12 +672,47 @@ class _RequestFilterBottomSheetState extends State<_RequestFilterBottomSheet> {
                           border: Border.all(color: const Color(0xFFEAEAEA)),
                         ),
                         child: CalendarDatePicker(
-                          initialDate: _selectedDate ?? DateTime.now(),
+                          initialDate: _activeDate,
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
-                          onDateChanged: (date) {
-                            setState(() => _selectedDate = date);
+                          onDateChanged: _onCalendarDateChanged,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "From: ${_fromDate == null ? '-' : _formatDate(_fromDate!)}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "To: ${_toDate == null ? '-' : _formatDate(_toDate!)}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _fromDate = null;
+                              _toDate = null;
+                            });
                           },
+                          child: const Text("Clear range"),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -708,7 +777,8 @@ class _RequestFilterBottomSheetState extends State<_RequestFilterBottomSheet> {
                       padding: EdgeInsets.zero,
                     ),
                     onPressed: () {
-                      widget.onApply(_selectedDate, _selectedStatus);
+                      final effectiveToDate = _toDate ?? _fromDate;
+                      widget.onApply(_fromDate, effectiveToDate, _selectedStatus);
                       Navigator.pop(context);
                     },
                     child: const Text(

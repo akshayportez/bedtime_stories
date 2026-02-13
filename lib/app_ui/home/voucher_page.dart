@@ -136,6 +136,14 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     return "$y-$m-$d";
   }
 
+  String _selectedDateRangeText() {
+    if (_dFrom.isEmpty && _dTo.isEmpty) return "";
+    if (_dFrom.isNotEmpty && _dTo.isNotEmpty) {
+      return "Date: $_dFrom - $_dTo";
+    }
+    return "Date: ${_dFrom.isNotEmpty ? _dFrom : _dTo}";
+  }
+
   Future<void> _openFilterSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -144,15 +152,15 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
       builder: (context) {
         return _RequestFilterBottomSheet(
           initialStatus: "Paid",
-          initialDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
-          onApply: (selectedDate, _) async {
-            if (selectedDate == null) {
+          initialFromDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
+          initialToDate: _dTo.isEmpty ? null : DateTime.tryParse(_dTo),
+          onApply: (fromDate, toDate, _) async {
+            if (fromDate == null && toDate == null) {
               _dFrom = "";
               _dTo = "";
             } else {
-              final formatted = _formatDate(selectedDate);
-              _dFrom = formatted;
-              _dTo = formatted;
+              _dFrom = fromDate == null ? "" : _formatDate(fromDate);
+              _dTo = toDate == null ? "" : _formatDate(toDate);
             }
             if (mounted) setState(() {});
             await _loadVouchers();
@@ -197,6 +205,8 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final selectedDateRangeText = _selectedDateRangeText();
+
     return Scaffold(
       appBar: BedtimeGradientAppBar(onProjectTap: _openProjectSelectionSheet),
       body: Padding(
@@ -245,6 +255,20 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
                 ),
               ],
             ),
+            if (selectedDateRangeText.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  selectedDateRangeText,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF666666),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Expanded(
               child: BlocBuilder<
