@@ -14,6 +14,7 @@ class VoucherApprovalRequestDetailPage extends StatefulWidget {
 
 class _VoucherApprovalRequestDetailPageState
     extends State<VoucherApprovalRequestDetailPage> {
+  bool _showApprovedDetails = false;
   _VoucherPaymentMode _paymentMode = _VoucherPaymentMode.cash;
   int? _selectedBankId;
   DateTime? _chequeDate;
@@ -23,6 +24,10 @@ class _VoucherApprovalRequestDetailPageState
   final TextEditingController _upiAppController = TextEditingController();
 
   String _money(double value) => value.toStringAsFixed(2);
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
 
   @override
   void initState() {
@@ -61,6 +66,15 @@ class _VoucherApprovalRequestDetailPageState
     final on = (widget.request.cApprovedDateTime ?? "").trim();
     if (on.isEmpty) return "(by $by)";
     return "(by $by on $on)";
+  }
+
+  String _requestedBannerText() {
+    final requestedBy = widget.request.cRequestedBy.trim().isEmpty
+        ? "you"
+        : widget.request.cRequestedBy;
+    final on = (widget.request.cRequestDateTime ?? "").trim();
+    if (on.isEmpty) return "(by $requestedBy)";
+    return "(by $requestedBy on $on)";
   }
 
   Future<void> _pickChequeDate() async {
@@ -231,6 +245,24 @@ class _VoucherApprovalRequestDetailPageState
     );
   }
 
+  Future<void> _refreshRequestPageData() async {
+    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userActionId = _resolveInt(userData["userId"]);
+    if (!mounted) return;
+    context.read<BedtimePaymentRequestBloc>().add(
+      BedtimePaymentRequestLoadRequested(
+        companyId: 1,
+        projectId: projectId,
+        userActionId: userActionId,
+        search: "",
+        statusFilter: "",
+        dFrom: "",
+        dTo: "",
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -262,6 +294,8 @@ class _VoucherApprovalRequestDetailPageState
           await _showSaveSuccessDialog();
           _isSuccessDialogVisible = false;
 
+          await _refreshRequestPageData();
+
           if (!context.mounted) return;
           Navigator.pop(context, true);
           return;
@@ -281,7 +315,45 @@ class _VoucherApprovalRequestDetailPageState
                 title: "Voucher",
                 onBack: () => Navigator.pop(context),
               ),
-              _StatusBanner(label: "Approved", details: _approvedBannerText()),
+              _ExpandableStatusBanner(
+                label: "Approved",
+                details: _approvedBannerText(),
+                isExpanded: _showApprovedDetails,
+                onTap: () {
+                  setState(() {
+                    _showApprovedDetails = !_showApprovedDetails;
+                  });
+                },
+                expandedChild: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: Colors.black),
+                        children: [
+                          const TextSpan(text: "Requested "),
+                          TextSpan(
+                            text: _requestedBannerText(),
+                            style: const TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF3C3C3C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Req No : ${widget.request.cRequestNo}",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child:
                     BlocBuilder<
