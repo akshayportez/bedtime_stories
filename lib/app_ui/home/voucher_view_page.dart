@@ -430,12 +430,12 @@ class _VoucherViewSummaryBar extends StatelessWidget {
               GestureDetector(
                 onTap: onEditTap,
                 child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/edit_icon.png',
+                  assetPath: 'assets/icons/edit_voucher.png',
                 ),
               ),
               const SizedBox(width: 10),
               const _VoucherActionIcon(
-                assetPath: 'assets/icons/delete_icon.png',
+                assetPath: 'assets/icons/delete_voucher.png',
                 backgroundColor: Color(0xFFFF4545),
                 borderColor: Color(0xFFFF4545),
                 iconColor: Colors.white,
