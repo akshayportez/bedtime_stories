@@ -126,7 +126,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return _RequestFilterBottomSheet(
+        return _ApprovalFilterBottomSheet(
           initialStatus: _statusFilter,
           initialFromDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
           initialToDate: _dTo.isEmpty ? null : DateTime.tryParse(_dTo),
@@ -331,6 +331,231 @@ class _ApprovalPageState extends State<ApprovalPage> {
                   ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ApprovalFilterBottomSheet extends StatefulWidget {
+  final String initialStatus;
+  final DateTime? initialFromDate;
+  final DateTime? initialToDate;
+  final void Function(DateTime? fromDate, DateTime? toDate, String status)
+      onApply;
+
+  const _ApprovalFilterBottomSheet({
+    required this.initialStatus,
+    required this.initialFromDate,
+    required this.initialToDate,
+    required this.onApply,
+  });
+
+  @override
+  State<_ApprovalFilterBottomSheet> createState() =>
+      _ApprovalFilterBottomSheetState();
+}
+
+class _ApprovalFilterBottomSheetState extends State<_ApprovalFilterBottomSheet> {
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  DateTime _activeDate = DateTime.now();
+  String _selectedStatus = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _fromDate = widget.initialFromDate;
+    _toDate = widget.initialToDate;
+    _activeDate = widget.initialToDate ?? widget.initialFromDate ?? DateTime.now();
+    _selectedStatus = widget.initialStatus;
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final d = date.day.toString().padLeft(2, "0");
+    return "$y-$m-$d";
+  }
+
+  void _onCalendarDateChanged(DateTime date) {
+    setState(() {
+      _activeDate = date;
+      if (_fromDate == null || _toDate != null) {
+        _fromDate = date;
+        _toDate = null;
+        return;
+      }
+
+      if (date.isBefore(_fromDate!)) {
+        _toDate = _fromDate;
+        _fromDate = date;
+      } else {
+        _toDate = date;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return FractionallySizedBox(
+      heightFactor: 0.82,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 12,
+          bottom: 16 + bottomPadding,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Text(
+                    "Filter",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEAEAEA)),
+                        ),
+                        child: CalendarDatePicker(
+                          initialDate: _activeDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          onDateChanged: _onCalendarDateChanged,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "From: ${_fromDate == null ? '-' : _formatDate(_fromDate!)}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "To: ${_toDate == null ? '-' : _formatDate(_toDate!)}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _fromDate = null;
+                              _toDate = null;
+                            });
+                          },
+                          child: const Text("Clear range"),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 6),
+                      _FilterRadioRow(
+                        label: "All",
+                        value: "",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Approved",
+                        value: "Approved",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                      _FilterRadioRow(
+                        label: "Rejected",
+                        value: "Rejected",
+                        groupValue: _selectedStatus,
+                        onChanged: (value) {
+                          setState(() => _selectedStatus = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 80,
+                  height: 36,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B84F3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: () {
+                      final effectiveToDate = _toDate ?? _fromDate;
+                      widget.onApply(_fromDate, effectiveToDate, _selectedStatus);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

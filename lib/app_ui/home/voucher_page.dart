@@ -13,6 +13,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   bool _isRouteObserverSubscribed = false;
   int _projectId = 0;
   int _userActionId = 0;
+  String _payModeFilter = "";
   String _dFrom = "";
   String _dTo = "";
 
@@ -68,7 +69,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
         projectId: projectId,
         userActionId: _userActionId,
         search: "",
-        statusFilter: "",
+        statusFilter: _payModeFilter,
         dFrom: _dFrom,
         dTo: _dTo,
       ),
@@ -107,7 +108,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
             projectId: _projectId,
             userActionId: _userActionId,
             search: value.trim(),
-            statusFilter: "",
+            statusFilter: _payModeFilter,
             dFrom: _dFrom,
             dTo: _dTo,
           ),
@@ -122,7 +123,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
         projectId: _projectId,
         userActionId: _userActionId,
         search: value.trim(),
-        statusFilter: "",
+        statusFilter: _payModeFilter,
         dFrom: _dFrom,
         dTo: _dTo,
       ),
@@ -150,11 +151,12 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return _RequestFilterBottomSheet(
-          initialStatus: "Paid",
+        return _VoucherFilterBottomSheet(
+          initialPayMode: _payModeFilter,
           initialFromDate: _dFrom.isEmpty ? null : DateTime.tryParse(_dFrom),
           initialToDate: _dTo.isEmpty ? null : DateTime.tryParse(_dTo),
-          onApply: (fromDate, toDate, _) async {
+          onApply: (fromDate, toDate, payMode) async {
+            _payModeFilter = payMode;
             if (fromDate == null && toDate == null) {
               _dFrom = "";
               _dTo = "";
@@ -520,6 +522,283 @@ class _VoucherCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VoucherFilterBottomSheet extends StatefulWidget {
+  final String initialPayMode;
+  final DateTime? initialFromDate;
+  final DateTime? initialToDate;
+  final void Function(DateTime? fromDate, DateTime? toDate, String payMode)
+      onApply;
+
+  const _VoucherFilterBottomSheet({
+    required this.initialPayMode,
+    required this.initialFromDate,
+    required this.initialToDate,
+    required this.onApply,
+  });
+
+  @override
+  State<_VoucherFilterBottomSheet> createState() =>
+      _VoucherFilterBottomSheetState();
+}
+
+class _VoucherFilterBottomSheetState extends State<_VoucherFilterBottomSheet> {
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  DateTime _activeDate = DateTime.now();
+  String _selectedPayMode = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _fromDate = widget.initialFromDate;
+    _toDate = widget.initialToDate;
+    _activeDate = widget.initialToDate ?? widget.initialFromDate ?? DateTime.now();
+    _selectedPayMode = widget.initialPayMode;
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final d = date.day.toString().padLeft(2, "0");
+    return "$y-$m-$d";
+  }
+
+  void _onCalendarDateChanged(DateTime date) {
+    setState(() {
+      _activeDate = date;
+      if (_fromDate == null || _toDate != null) {
+        _fromDate = date;
+        _toDate = null;
+        return;
+      }
+
+      if (date.isBefore(_fromDate!)) {
+        _toDate = _fromDate;
+        _fromDate = date;
+      } else {
+        _toDate = date;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return FractionallySizedBox(
+      heightFactor: 0.82,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 12,
+          bottom: 16 + bottomPadding,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Text(
+                    "Filter",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEAEAEA)),
+                        ),
+                        child: CalendarDatePicker(
+                          initialDate: _activeDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          onDateChanged: _onCalendarDateChanged,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "From: ${_fromDate == null ? '-' : _formatDate(_fromDate!)}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "To: ${_toDate == null ? '-' : _formatDate(_toDate!)}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4C4C4C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _fromDate = null;
+                              _toDate = null;
+                            });
+                          },
+                          child: const Text("Clear range"),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 6),
+                      _VoucherFilterRadioRow(
+                        label: "All",
+                        value: "",
+                        groupValue: _selectedPayMode,
+                        onChanged: (value) {
+                          setState(() => _selectedPayMode = value);
+                        },
+                      ),
+                      _VoucherFilterRadioRow(
+                        label: "Cash",
+                        value: "cash",
+                        groupValue: _selectedPayMode,
+                        onChanged: (value) {
+                          setState(() => _selectedPayMode = value);
+                        },
+                      ),
+                      _VoucherFilterRadioRow(
+                        label: "Bank",
+                        value: "bank",
+                        groupValue: _selectedPayMode,
+                        onChanged: (value) {
+                          setState(() => _selectedPayMode = value);
+                        },
+                      ),
+                      _VoucherFilterRadioRow(
+                        label: "Cheque",
+                        value: "cheque",
+                        groupValue: _selectedPayMode,
+                        onChanged: (value) {
+                          setState(() => _selectedPayMode = value);
+                        },
+                      ),
+                      _VoucherFilterRadioRow(
+                        label: "UPI",
+                        value: "upi",
+                        groupValue: _selectedPayMode,
+                        onChanged: (value) {
+                          setState(() => _selectedPayMode = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 80,
+                  height: 36,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B84F3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: () {
+                      final effectiveToDate = _toDate ?? _fromDate;
+                      widget.onApply(_fromDate, effectiveToDate, _selectedPayMode);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoucherFilterRadioRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final String groupValue;
+  final ValueChanged<String> onChanged;
+
+  const _VoucherFilterRadioRow({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(value),
+      child: Row(
+        children: [
+          Radio<String>(
+            value: value,
+            groupValue: groupValue,
+            onChanged: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Colors.black),
+          ),
+        ],
       ),
     );
   }
