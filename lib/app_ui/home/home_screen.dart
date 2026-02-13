@@ -9,6 +9,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
+  int _approvalPendingCount = 0;
 
   final List<String> tabs = ["Request", "Approval", "Voucher", "Reports"];
 
@@ -34,6 +35,85 @@ class _HomeScreenState extends State<HomeScreen> {
         dTo: "",
       ),
     );
+
+    await _loadApprovalPendingCount();
+  }
+
+  Future<void> _loadApprovalPendingCount() async {
+    try {
+      final repository = context.read<BedtimePaymentRequestBloc>().repository;
+      final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+      final requests = await repository.getPaymentRequests(
+            companyId: 1,
+            projectId: projectId,
+            userActionId: 0,
+            search: "",
+            statusFilter: "Requested",
+            dFrom: "",
+            dTo: "",
+          );
+
+      final pendingCount = requests
+          .where((r) {
+            final status = r.cStatus.trim().toLowerCase();
+            return status == "requested" || status == "reqested";
+          })
+          .length;
+
+      if (!mounted) return;
+      setState(() {
+        _approvalPendingCount = pendingCount;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _approvalPendingCount = 0;
+      });
+    }
+  }
+
+  Widget _buildFabIcon() {
+    if (selectedIndex != 1 || _approvalPendingCount <= 0) {
+      return const Icon(Icons.add, size: 28, color: Colors.white);
+    }
+
+    return SizedBox.expand(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Center(child: Icon(Icons.add, size: 28, color: Colors.white)),
+          Positioned(
+            right: -3,
+            top: -3,
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF4D5A),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                _approvalPendingCount > 99 ? "99" : "$_approvalPendingCount",
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApprovalPendingCount();
   }
 
   @override
@@ -70,9 +150,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   await _reloadApprovalList();
                   return;
                 }
+                if (selectedIndex == 2) {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VoucherApprovalRequestsPage(),
+                    ),
+                  );
+                  return;
+                }
                 Navigator.pushNamed(context, "/createRequestPage");
               },
-              child: const Icon(Icons.add, size: 28, color: Colors.white),
+              child: _buildFabIcon(),
             ),
 
       /// Bottom Navigation
@@ -84,8 +173,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: _BottomNavBar(
           selectedIndex: selectedIndex,
+          showApprovalDot: selectedIndex != 1 && _approvalPendingCount > 0,
           onChanged: (index) {
             setState(() => selectedIndex = index);
+            _loadApprovalPendingCount();
           },
         ),
       ),
@@ -95,9 +186,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _BottomNavBar extends StatelessWidget {
   final int selectedIndex;
+  final bool showApprovalDot;
   final Function(int) onChanged;
 
-  const _BottomNavBar({required this.selectedIndex, required this.onChanged});
+  const _BottomNavBar({
+    required this.selectedIndex,
+    required this.showApprovalDot,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +207,7 @@ class _BottomNavBar extends StatelessWidget {
         border: Border.all(color: appPrimaryColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -131,6 +227,7 @@ class _BottomNavBar extends StatelessWidget {
             assetIcon: "assets/icons/approval_icon.png",
             text: "Approval",
             isSelected: selectedIndex == 1,
+            showDot: showApprovalDot,
             onTap: () => onChanged(1),
           ),
           _NavItem(
@@ -155,12 +252,14 @@ class _NavItem extends StatelessWidget {
   final String assetIcon;
   final String text;
   final bool isSelected;
+  final bool showDot;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.assetIcon,
     required this.text,
     required this.isSelected,
+    this.showDot = false,
     required this.onTap,
   });
 
@@ -187,10 +286,30 @@ class _NavItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ImageIcon(
-              AssetImage(assetIcon),
-              size: 22,
-              color: isSelected ? Colors.white : appPrimaryColor,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ImageIcon(
+                  AssetImage(assetIcon),
+                  size: 22,
+                  color: isSelected ? Colors.white : appPrimaryColor,
+                ),
+                if (showDot)
+                  const Positioned(
+                    right: -1,
+                    top: -2,
+                    child: SizedBox(
+                      width: 8,
+                      height: 8,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFF3B30),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             if (isSelected) ...[
               const SizedBox(width: 6),
