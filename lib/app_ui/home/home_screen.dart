@@ -10,6 +10,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
   int _approvalPendingCount = 0;
+  int _voucherPendingCount = 0;
 
   final List<String> tabs = ["Request", "Approval", "Voucher", "Reports"];
 
@@ -37,6 +38,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     await _loadApprovalPendingCount();
+  }
+
+  Future<void> _reloadVoucherList() async {
+    await _loadVoucherPendingCount();
   }
 
   Future<void> _loadApprovalPendingCount() async {
@@ -72,8 +77,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadVoucherPendingCount() async {
+    try {
+      final repository = context.read<BedtimePaymentRequestBloc>().repository;
+      final projectId = await BedtimeLocalStorage.getSelectedProjectId();
+      final userData = await BedtimeLocalStorage.getUserData();
+      final userActionId = _resolveInt(userData["userId"]);
+      final requests = await repository.getPaymentRequests(
+        companyId: 1,
+        projectId: projectId,
+        userActionId: userActionId,
+        search: "",
+        statusFilter: "Approved",
+        dFrom: "",
+        dTo: "",
+      );
+
+      final pendingCount = requests
+          .where((r) => r.cStatus.trim().toLowerCase() == "approved")
+          .length;
+
+      if (!mounted) return;
+      setState(() {
+        _voucherPendingCount = pendingCount;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _voucherPendingCount = 0;
+      });
+    }
+  }
+
   Widget _buildFabIcon() {
-    if (selectedIndex != 1 || _approvalPendingCount <= 0) {
+    final badgeCount = switch (selectedIndex) {
+      1 => _approvalPendingCount,
+      2 => _voucherPendingCount,
+      _ => 0,
+    };
+
+    if (badgeCount <= 0) {
       return const Icon(Icons.add, size: 28, color: Colors.white);
     }
 
@@ -94,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: BoxShape.circle,
               ),
               child: Text(
-                _approvalPendingCount > 99 ? "99" : "$_approvalPendingCount",
+                badgeCount > 99 ? "99" : "$badgeCount",
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
@@ -114,6 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadApprovalPendingCount();
+    _loadVoucherPendingCount();
   }
 
   @override
@@ -157,6 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       builder: (_) => const VoucherApprovalRequestsPage(),
                     ),
                   );
+                  await _reloadVoucherList();
                   return;
                 }
                 Navigator.pushNamed(context, "/createRequestPage");
@@ -174,9 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _BottomNavBar(
           selectedIndex: selectedIndex,
           showApprovalDot: selectedIndex != 1 && _approvalPendingCount > 0,
+          showVoucherDot: selectedIndex != 2 && _voucherPendingCount > 0,
           onChanged: (index) {
             setState(() => selectedIndex = index);
             _loadApprovalPendingCount();
+            _loadVoucherPendingCount();
           },
         ),
       ),
@@ -187,11 +234,13 @@ class _HomeScreenState extends State<HomeScreen> {
 class _BottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final bool showApprovalDot;
+  final bool showVoucherDot;
   final Function(int) onChanged;
 
   const _BottomNavBar({
     required this.selectedIndex,
     required this.showApprovalDot,
+    required this.showVoucherDot,
     required this.onChanged,
   });
 
@@ -234,6 +283,7 @@ class _BottomNavBar extends StatelessWidget {
             assetIcon: "assets/icons/voucher_icon.png",
             text: "Voucher",
             isSelected: selectedIndex == 2,
+            showDot: showVoucherDot,
             onTap: () => onChanged(2),
           ),
           _NavItem(
