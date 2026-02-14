@@ -1410,6 +1410,85 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     return "${(bytes / 1024).toStringAsFixed(0)} KB";
   }
 
+  String _imageUrl(String value) {
+    final path = value.trim();
+    if (path.isEmpty) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+    final base = BedtimeApiConstants.baseUrl.endsWith("/")
+        ? BedtimeApiConstants.baseUrl.substring(
+            0,
+            BedtimeApiConstants.baseUrl.length - 1,
+          )
+        : BedtimeApiConstants.baseUrl;
+    final normalizedPath = path.startsWith("/") ? path : "/$path";
+    return "$base$normalizedPath";
+  }
+
+  void _openImagePreview(_CreateRequestUploadItem item) {
+    final localPath = item.filePath.trim();
+    final remoteUrl = _imageUrl(item.attachmentPath);
+    if (localPath.isEmpty && remoteUrl.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: localPath.isNotEmpty
+                      ? Image.file(
+                          File(localPath),
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) {
+                            return const Center(
+                              child: Text(
+                                "Unable to load image",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          },
+                        )
+                      : Image.network(
+                          remoteUrl,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                          },
+                          errorBuilder: (_, __, ___) {
+                            return const Center(
+                              child: Text(
+                                "Unable to load image",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildUploadSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1501,6 +1580,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     final progressPercent = (item.progress * 100).round().clamp(0, 100);
     final hasError = item.errorMessage.isNotEmpty;
     final sizeText = _formatFileSize(item.fileSizeBytes);
+    final imageUrl = _imageUrl(item.attachmentPath);
+    final hasPreview = item.filePath.isNotEmpty || imageUrl.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1514,28 +1595,41 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              width: 34,
-              height: 34,
-              color: const Color(0xFFEAE2FF),
-              alignment: Alignment.center,
-              child: item.filePath.isNotEmpty
-                  ? Image.file(
-                      File(item.filePath),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.insert_drive_file_outlined,
-                        color: Color(0xFF7A5CF5),
-                        size: 16,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.insert_drive_file_outlined,
-                      color: Color(0xFF7A5CF5),
-                      size: 16,
-                    ),
+          GestureDetector(
+            onTap: hasPreview ? () => _openImagePreview(item) : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                width: 34,
+                height: 34,
+                color: const Color(0xFFEAE2FF),
+                alignment: Alignment.center,
+                child: item.filePath.isNotEmpty
+                    ? Image.file(
+                        File(item.filePath),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.insert_drive_file_outlined,
+                          color: Color(0xFF7A5CF5),
+                          size: 16,
+                        ),
+                      )
+                    : imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.insert_drive_file_outlined,
+                              color: Color(0xFF7A5CF5),
+                              size: 16,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.insert_drive_file_outlined,
+                            color: Color(0xFF7A5CF5),
+                            size: 16,
+                          ),
+              ),
             ),
           ),
           const SizedBox(width: 8),

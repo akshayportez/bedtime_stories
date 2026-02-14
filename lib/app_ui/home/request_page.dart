@@ -1004,15 +1004,19 @@ class _RequestCard extends StatelessWidget {
                 ),
 
                 Flexible(
-                  child: Text(
-                    "\u20B9$amount",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF256DFB),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "\u20B9$amount",
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF256DFB),
+                        ),
+                      ),
                     ),
                   ),
                 ),
