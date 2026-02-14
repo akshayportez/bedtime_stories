@@ -260,15 +260,13 @@ class _RequestPageState extends State<RequestPage> {
                             );
                             if (action == "deleted" || action == "updated") {
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    action == "deleted"
-                                        ? "Deleted successfully"
-                                        : "Updated successfully",
+                              if (action == "deleted") {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Deleted successfully"),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                               await _loadRequests();
                             }
                           },

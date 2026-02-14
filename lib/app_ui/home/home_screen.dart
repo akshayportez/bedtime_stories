@@ -81,12 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final repository = context.read<BedtimePaymentRequestBloc>().repository;
       final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-      final userData = await BedtimeLocalStorage.getUserData();
-      final userActionId = _resolveInt(userData["userId"]);
       final requests = await repository.getPaymentRequests(
         companyId: 1,
         projectId: projectId,
-        userActionId: userActionId,
+        userActionId: 0,
         search: "",
         statusFilter: "Approved",
         dFrom: "",

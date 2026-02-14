@@ -12,7 +12,7 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
   final TextEditingController _searchController = TextEditingController();
   late final BedtimePaymentRequestBloc _bloc;
   int _projectId = 0;
-  int _userActionId = 0;
+  static const int _userActionId = 0;
 
   @override
   void initState() {
@@ -32,12 +32,7 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
 
   Future<void> _loadApprovedRequests() async {
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue = userData["userId"];
     _projectId = projectId;
-    _userActionId = userIdValue is int
-        ? userIdValue
-        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
 
     if (!mounted) return;
     _bloc.add(
