@@ -304,7 +304,12 @@ class _VoucherApprovalRequestCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: const Color(0xFFF6F9FC),
-              borderRadius: BorderRadius.circular(9),
+               borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(0),
+                topRight: Radius.circular(0),
+                bottomLeft: Radius.circular(9),
+                bottomRight: Radius.circular(9),
+              ),
             ),
             child: Row(
               children: [
