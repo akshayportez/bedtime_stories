@@ -10,9 +10,14 @@ class VoucherViewPage extends StatefulWidget {
 }
 
 class _VoucherViewPageState extends State<VoucherViewPage> {
+  // Temporary sample file until API PDF URL is wired.
+  static const String _sampleVoucherPdfUrl =
+      'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+
   bool _showPaidDetails = false;
   bool _isDeleting = false;
   bool _isSuccessDialogVisible = false;
+  bool _isSharingPdf = false;
 
   String _money(double value) => value.toStringAsFixed(2);
   int _resolveInt(dynamic value, {int fallback = 0}) {
@@ -286,6 +291,123 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     }
   }
 
+  Future<void> _openVoucherPdf({String? pdfUrl}) async {
+    final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _VoucherPdfViewerPage(
+          title: 'Voucher PDF',
+          pdfUrl: resolvedPdfUrl,
+        ),
+      ),
+    );
+  }
+
+  String _resolvedPdfUrl(String? pdfUrl) {
+    final incomingPdfUrl = (pdfUrl ?? '').trim();
+    return incomingPdfUrl.isEmpty ? _sampleVoucherPdfUrl : incomingPdfUrl;
+  }
+
+  String _buildPdfFileName(String pdfUrl) {
+    final uri = Uri.tryParse(pdfUrl);
+    var candidateName = '';
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      candidateName = uri.pathSegments.last.trim();
+    }
+
+    candidateName = candidateName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final hasValidPdfName =
+        candidateName.isNotEmpty &&
+        candidateName.toLowerCase().endsWith('.pdf') &&
+        candidateName != '.pdf';
+
+    if (!hasValidPdfName) {
+      return 'voucher_${widget.request.nPayReqId}_$now.pdf';
+    }
+
+    final baseName = candidateName.replaceFirst(
+      RegExp(r'\.pdf$', caseSensitive: false),
+      '',
+    );
+    return '${baseName}_$now.pdf';
+  }
+
+  Future<File> _downloadPdfToTempFile(String pdfUrl) async {
+    final uri = Uri.tryParse(pdfUrl);
+    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+      throw Exception('Invalid PDF URL');
+    }
+
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < HttpStatus.ok ||
+          response.statusCode >= HttpStatus.multipleChoices) {
+        throw Exception('Failed to download PDF (HTTP ${response.statusCode})');
+      }
+
+      final bytesBuilder = BytesBuilder(copy: false);
+      await for (final chunk in response) {
+        bytesBuilder.add(chunk);
+      }
+
+      final fileName = _buildPdfFileName(pdfUrl);
+      final filePath =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
+      final file = File(filePath);
+      await file.writeAsBytes(bytesBuilder.takeBytes(), flush: true);
+      return file;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<void> _shareVoucherPdf({String? pdfUrl}) async {
+    if (_isSharingPdf) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isSharingPdf = true);
+
+    try {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Preparing PDF to share...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
+      final pdfFile = await _downloadPdfToTempFile(resolvedPdfUrl);
+
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(pdfFile.path, mimeType: 'application/pdf'),
+          ],
+          text: 'Voucher PDF',
+          subject: 'Voucher PDF',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unable to share PDF: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSharingPdf = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -548,6 +670,8 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                             ? null
                             : () => _openEditPage(detail!),
                         onDeleteTap: _showDeleteDialog,
+                        onViewPdfTap: _openVoucherPdf,
+                        onSharePdfTap: _isSharingPdf ? null : _shareVoucherPdf,
                         bottomPadding: bottomInset,
                       ),
                     ],
@@ -575,6 +699,8 @@ class _VoucherViewSummaryBar extends StatelessWidget {
   final String upiApp;
   final VoidCallback? onEditTap;
   final VoidCallback? onDeleteTap;
+  final VoidCallback? onViewPdfTap;
+  final VoidCallback? onSharePdfTap;
   final double bottomPadding;
 
   const _VoucherViewSummaryBar({
@@ -590,6 +716,8 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.upiApp,
     required this.onEditTap,
     required this.onDeleteTap,
+    required this.onViewPdfTap,
+    required this.onSharePdfTap,
     required this.bottomPadding,
   });
 
@@ -701,9 +829,19 @@ class _VoucherViewSummaryBar extends StatelessWidget {
             children: [
               const _VoucherActionIcon(assetPath: 'assets/icons/print_icon.png'),
               const SizedBox(width: 10),
-              const _VoucherActionIcon(assetPath: 'assets/icons/watch_icon.png'),
+              GestureDetector(
+                onTap: onViewPdfTap,
+                child: const _VoucherActionIcon(
+                  assetPath: 'assets/icons/watch_icon.png',
+                ),
+              ),
               const SizedBox(width: 10),
-              const _VoucherActionIcon(assetPath: 'assets/icons/share_icon.png'),
+              GestureDetector(
+                onTap: onSharePdfTap,
+                child: const _VoucherActionIcon(
+                  assetPath: 'assets/icons/share_icon.png',
+                ),
+              ),
               const SizedBox(width: 10),
               GestureDetector(
                 onTap: onEditTap,
@@ -758,6 +896,35 @@ class _VoucherActionIcon extends StatelessWidget {
         fit: BoxFit.contain,
         color: iconColor,
         colorBlendMode: BlendMode.srcIn,
+      ),
+    );
+  }
+}
+
+class _VoucherPdfViewerPage extends StatelessWidget {
+  final String title;
+  final String pdfUrl;
+
+  const _VoucherPdfViewerPage({required this.title, required this.pdfUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text(title),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close),
+        ),
+      ),
+      body: SfPdfViewer.network(
+        pdfUrl,
+        onDocumentLoadFailed: (details) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unable to load PDF: ${details.error}')),
+          );
+        },
       ),
     );
   }

@@ -244,9 +244,10 @@ class _BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
     return Container(
-      height: 82,
-      padding: EdgeInsets.symmetric(horizontal: 10),
+      height: isTablet ? 78 : 70,
+      padding: EdgeInsets.symmetric(horizontal: 6),
 
       decoration: BoxDecoration(
         color: Colors.white,
@@ -264,31 +265,51 @@ class _BottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavItem(
-            assetIcon: "assets/icons/request_icon.png",
-            text: "Request",
-            isSelected: selectedIndex == 0,
-            onTap: () => onChanged(0),
+          Expanded(
+            flex: selectedIndex == 0 ? 2 : 1,
+            child: Center(
+              child: _NavItem(
+                assetIcon: "assets/icons/request_icon.png",
+                text: "Request",
+                isSelected: selectedIndex == 0,
+                onTap: () => onChanged(0),
+              ),
+            ),
           ),
-          _NavItem(
-            assetIcon: "assets/icons/approval_icon.png",
-            text: "Approval",
-            isSelected: selectedIndex == 1,
-            showDot: showApprovalDot,
-            onTap: () => onChanged(1),
+          Expanded(
+            flex: selectedIndex == 1 ? 2 : 1,
+            child: Center(
+              child: _NavItem(
+                assetIcon: "assets/icons/approval_icon.png",
+                text: "Approval",
+                isSelected: selectedIndex == 1,
+                showDot: showApprovalDot,
+                onTap: () => onChanged(1),
+              ),
+            ),
           ),
-          _NavItem(
-            assetIcon: "assets/icons/voucher_icon.png",
-            text: "Voucher",
-            isSelected: selectedIndex == 2,
-            showDot: showVoucherDot,
-            onTap: () => onChanged(2),
+          Expanded(
+            flex: selectedIndex == 2 ? 2 : 1,
+            child: Center(
+              child: _NavItem(
+                assetIcon: "assets/icons/voucher_icon.png",
+                text: "Voucher",
+                isSelected: selectedIndex == 2,
+                showDot: showVoucherDot,
+                onTap: () => onChanged(2),
+              ),
+            ),
           ),
-          _NavItem(
-            assetIcon: "assets/icons/reports_icon.png",
-            text: "Reports",
-            isSelected: selectedIndex == 3,
-            onTap: () => onChanged(3),
+          Expanded(
+            flex: selectedIndex == 3 ? 2 : 1,
+            child: Center(
+              child: _NavItem(
+                assetIcon: "assets/icons/reports_icon.png",
+                text: "Reports",
+                isSelected: selectedIndex == 3,
+                onTap: () => onChanged(3),
+              ),
+            ),
           ),
         ],
       ),
@@ -313,13 +334,14 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 14 : 10,
-          vertical: isSelected ? 16 : 14,
+          horizontal: isSelected ? (isTablet ? 34 : 18) : (isTablet ? 16 : 10),
+          vertical: isSelected ? 14 : 12,
         ),
         decoration: BoxDecoration(
           color: isSelected ? null : Colors.transparent,
@@ -333,6 +355,7 @@ class _NavItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(50),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,

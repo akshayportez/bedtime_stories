@@ -2,6 +2,7 @@ library lib_files;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:bedtime_stories/app_ui/home/bloc/get_accounts_list_bloc/bedtime_get_accounts_list_bloc.dart';
@@ -84,6 +85,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 /// Parts
 part 'globals.dart';
