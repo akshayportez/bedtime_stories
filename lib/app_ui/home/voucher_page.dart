@@ -17,6 +17,11 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   String _dFrom = "";
   String _dTo = "";
 
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +131,30 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
         statusFilter: _payModeFilter,
         dFrom: _dFrom,
         dTo: _dTo,
+      ),
+    );
+  }
+
+  Future<void> _reloadAfterVoucherChange() async {
+    await _loadVouchers();
+
+    final projectId = _projectId > 0
+        ? _projectId
+        : await BedtimeLocalStorage.getSelectedProjectId();
+    final userActionId = _userActionId > 0
+        ? _userActionId
+        : _resolveInt((await BedtimeLocalStorage.getUserData())["userId"]);
+
+    if (!mounted) return;
+    context.read<BedtimePaymentRequestBloc>().add(
+      BedtimePaymentRequestLoadRequested(
+        companyId: 1,
+        projectId: projectId,
+        userActionId: userActionId,
+        search: "",
+        statusFilter: "",
+        dFrom: "",
+        dTo: "",
       ),
     );
   }
@@ -314,6 +343,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
                           section: voucher.cSectionName,
                           amount: _formatAmount(voucher.nPayableAmount),
                           payMode: voucher.cPaymode,
+                          onRefresh: _reloadAfterVoucherChange,
                         );
                       },
                     );
@@ -339,6 +369,7 @@ class _VoucherCard extends StatelessWidget {
   final String section;
   final String amount;
   final String payMode;
+  final Future<void> Function()? onRefresh;
 
   const _VoucherCard({
     required this.request,
@@ -349,18 +380,22 @@ class _VoucherCard extends StatelessWidget {
     required this.section,
     required this.amount,
     required this.payMode,
+    this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final shouldReload = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (_) => VoucherViewPage(request: request),
           ),
         );
+        if (shouldReload == true && onRefresh != null) {
+          await onRefresh!();
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

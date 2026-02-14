@@ -11,8 +11,14 @@ class VoucherViewPage extends StatefulWidget {
 
 class _VoucherViewPageState extends State<VoucherViewPage> {
   bool _showPaidDetails = false;
+  bool _isDeleting = false;
+  bool _isSuccessDialogVisible = false;
 
   String _money(double value) => value.toStringAsFixed(2);
+  int _resolveInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
 
   @override
   void initState() {
@@ -63,6 +69,205 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
       result.add(path);
     }
     return result.toList();
+  }
+
+  Future<void> _showDeleteSuccessDialog() async {
+    if (_isSuccessDialogVisible) return;
+    _isSuccessDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.65),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  "assets/icons/succesfull_animation.gif",
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  "Successful",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Voucher Deleted Successfully",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteVoucher() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+    try {
+      final userData = await BedtimeLocalStorage.getUserData();
+      final userActionId = _resolveInt(userData["userId"]);
+
+      await context.read<BedtimePaymentVoucherDetailBloc>().repository
+          .deletePaymentVoucher(
+            companyId: 1,
+            payReqId: widget.request.nPayReqId,
+            userActionId: userActionId,
+          );
+      if (!mounted) return;
+
+      Navigator.pop(context);
+
+      final rootNavigator = Navigator.of(context, rootNavigator: true);
+      unawaited(
+        Future<void>.delayed(const Duration(seconds: 2), () {
+          if (!rootNavigator.mounted) return;
+          if (rootNavigator.canPop()) {
+            rootNavigator.pop();
+          }
+        }),
+      );
+
+      await _showDeleteSuccessDialog();
+      _isSuccessDialogVisible = false;
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
+  Future<void> _showDeleteDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.close, size: 20),
+                  ),
+                ),
+                Image.asset(
+                  "assets/icons/delete_animation.gif",
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Delete",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Do you really want to delete these records?\nThis process cannot be undone",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF616161),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 110,
+                      height: 40,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.black),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 110,
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: _isDeleting ? null : _deleteVoucher,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF44336),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text(
+                          "Delete",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openEditPage(BedtimePaymentVoucherDetailResponse detail) async {
@@ -342,6 +547,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                         onEditTap: detail == null
                             ? null
                             : () => _openEditPage(detail!),
+                        onDeleteTap: _showDeleteDialog,
                         bottomPadding: bottomInset,
                       ),
                     ],
@@ -368,6 +574,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
   final String upiRefNo;
   final String upiApp;
   final VoidCallback? onEditTap;
+  final VoidCallback? onDeleteTap;
   final double bottomPadding;
 
   const _VoucherViewSummaryBar({
@@ -382,6 +589,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.upiRefNo,
     required this.upiApp,
     required this.onEditTap,
+    required this.onDeleteTap,
     required this.bottomPadding,
   });
 
@@ -504,11 +712,14 @@ class _VoucherViewSummaryBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const _VoucherActionIcon(
-                assetPath: 'assets/icons/delete_voucher.png',
-                backgroundColor: Color(0xFFFF4545),
-                borderColor: Color(0xFFFF4545),
-                iconColor: Colors.white,
+              GestureDetector(
+                onTap: onDeleteTap,
+                child: const _VoucherActionIcon(
+                  assetPath: 'assets/icons/delete_voucher.png',
+                  backgroundColor: Color(0xFFFF4545),
+                  borderColor: Color(0xFFFF4545),
+                  iconColor: Colors.white,
+                ),
               ),
             ],
           ),

@@ -35,4 +35,41 @@ class BedtimePaymentVoucherDetailRepository {
       );
     }
   }
+
+  Future<void> deletePaymentVoucher({
+    required int companyId,
+    required int payReqId,
+    required int userActionId,
+  }) async {
+    try {
+      final response = await apiProvider.deletePaymentVoucher(
+        companyId: companyId,
+        payReqId: payReqId,
+        userActionId: userActionId,
+      );
+
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw Exception("Failed to delete voucher");
+      }
+
+      final nFlag = data["nFlag"];
+      final resolvedFlag = nFlag is int
+          ? nFlag
+          : int.tryParse(nFlag?.toString() ?? "") ?? 0;
+      final message = (data["cMessage"] ?? "").toString();
+
+      if (resolvedFlag != 1) {
+        throw Exception(message.isEmpty ? "Failed to delete voucher" : message);
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data?["cMessage"] ?? "Failed to delete voucher",
+      );
+    } catch (e) {
+      throw Exception(
+        e.toString().replaceFirst("Exception:", "").trim(),
+      );
+    }
+  }
 }

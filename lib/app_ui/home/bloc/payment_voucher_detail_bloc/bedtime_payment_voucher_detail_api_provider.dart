@@ -16,4 +16,18 @@ class BedtimePaymentVoucherDetailApiProvider {
       },
     );
   }
+
+  Future<Response> deletePaymentVoucher({
+    required int companyId,
+    required int payReqId,
+    required int userActionId,
+  }) {
+    return _dio.delete(
+      "${BedtimeApiEndpoints.paymentVoucher}/$payReqId",
+      queryParameters: {
+        "nCompanyId": companyId,
+        "nUserActionId": userActionId,
+      },
+    );
+  }
 }
