@@ -533,7 +533,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                             tax: _money(taxAmount),
                             payable: _money(payableAmount),
                             showActions: _isRequested || _isRejected,
-                            onEdit: _isRequested
+                            onEdit: _isRequested || _isRejected
                                 ? () => _openEditPage(detail: detail, taxes: taxes)
                                 : null,
                             onDelete: _isRequested || _isRejected

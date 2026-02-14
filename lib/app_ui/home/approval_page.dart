@@ -298,14 +298,6 @@ class _ApprovalPageState extends State<ApprovalPage> {
                                   ),
                                 );
                                 if (updated == true) {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("Updated successfully"),
-                                    ),
-                                  );
                                   await _loadApprovals();
                                 }
                               },

@@ -13,6 +13,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   bool _showActionButtons = false;
   bool _isApproving = false;
   bool _isRejecting = false;
+  bool _isResultDialogVisible = false;
   bool _showApprovedDetails = false;
   bool _showRejectedDetails = false;
   bool _showPaidDetails = false;
@@ -55,6 +56,64 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
 
   String _on(String? value) {
     return (value ?? '').trim();
+  }
+
+  Future<void> _showActionSuccessDialog({
+    required String gifPath,
+    required String title,
+    required String message,
+  }) async {
+    if (_isResultDialogVisible) return;
+    _isResultDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFEFEFEF),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.65),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  gifPath,
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   RichText _historyLine({
@@ -124,23 +183,28 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
             }
             if (state is BedtimeRequestApproveFailure) {
               if (mounted) setState(() => _isApproving = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
               return;
             }
             if (state is BedtimeRequestApproveSuccess) {
               if (mounted) setState(() => _isApproving = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    state.response.cMessage.isEmpty
-                        ? "Approved successfully"
-                        : state.response.cMessage,
-                  ),
-                ),
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
+              unawaited(
+                Future<void>.delayed(const Duration(seconds: 2), () {
+                  if (!rootNavigator.mounted) return;
+                  if (rootNavigator.canPop()) {
+                    rootNavigator.pop();
+                  }
+                }),
               );
-              Navigator.pop(context, true);
+              _showActionSuccessDialog(
+                gifPath: "assets/icons/succesfull_animation.gif",
+                title: "Approved",
+                message: "Payment Request Approved Successfully",
+              ).then((_) {
+                _isResultDialogVisible = false;
+                if (!mounted) return;
+                Navigator.pop(context, true);
+              });
             }
           },
         ),
@@ -152,23 +216,28 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
             }
             if (state is BedtimeRequestRejectFailure) {
               if (mounted) setState(() => _isRejecting = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
               return;
             }
             if (state is BedtimeRequestRejectSuccess) {
               if (mounted) setState(() => _isRejecting = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    state.response.cMessage.isEmpty
-                        ? "Rejected successfully"
-                        : state.response.cMessage,
-                  ),
-                ),
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
+              unawaited(
+                Future<void>.delayed(const Duration(seconds: 2), () {
+                  if (!rootNavigator.mounted) return;
+                  if (rootNavigator.canPop()) {
+                    rootNavigator.pop();
+                  }
+                }),
               );
-              Navigator.pop(context, true);
+              _showActionSuccessDialog(
+                gifPath: "assets/icons/rejected_animation.gif",
+                title: "Rejected",
+                message: "Payment Request Rejected",
+              ).then((_) {
+                _isResultDialogVisible = false;
+                if (!mounted) return;
+                Navigator.pop(context, true);
+              });
             }
           },
         ),
@@ -415,7 +484,8 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                               tax: _money(taxAmount),
                               payable: _money(payableAmount),
                               bottomPadding: bottomInset,
-                              showActionButtons: _showActionButtons,
+                              showActionButtons: !_isPaid && _showActionButtons,
+                              showEditButton: !_isPaid,
                               isApproving: _isApproving,
                               isRejecting: _isRejecting,
                               onEditTap: () {
@@ -641,6 +711,7 @@ class _ApprovalSummaryBar extends StatelessWidget {
   final String payable;
   final double bottomPadding;
   final bool showActionButtons;
+  final bool showEditButton;
   final bool isApproving;
   final bool isRejecting;
   final VoidCallback onEditTap;
@@ -654,6 +725,7 @@ class _ApprovalSummaryBar extends StatelessWidget {
     required this.payable,
     required this.bottomPadding,
     required this.showActionButtons,
+    required this.showEditButton,
     required this.isApproving,
     required this.isRejecting,
     required this.onEditTap,
@@ -698,7 +770,7 @@ class _ApprovalSummaryBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (!showActionButtons)
+              if (!showActionButtons && showEditButton)
                 GestureDetector(
                   onTap: onEditTap,
                   child: Container(
@@ -716,6 +788,8 @@ class _ApprovalSummaryBar extends StatelessWidget {
                     ),
                   ),
                 )
+              else if (!showActionButtons && !showEditButton)
+                const SizedBox.shrink()
               else
                 Row(
                   children: [

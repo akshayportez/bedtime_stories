@@ -852,6 +852,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           tds: _formatCurrency(_tdsAmount),
           tax: _formatCurrency(_totalTaxAmount),
           payable: _formatCurrency(_payableAmount),
+          saveButtonLabel: widget.isEditMode ? "Resubmit" : "Save",
           isSaving: _isSaving,
           onSave: _onSaveTapped,
         ),
@@ -1274,6 +1275,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     final userData = await BedtimeLocalStorage.getUserData();
     final companyId = _resolveInt(userData["companyId"], fallback: 1);
     final userActionId = _resolveInt(userData["userId"]);
+    final normalizedEditStatus = _editingStatus.trim().toLowerCase();
+    final saveStatus = (widget.isEditMode && normalizedEditStatus == "rejected")
+        ? "Requested"
+        : (_editingStatus.isEmpty ? "Requested" : _editingStatus);
 
     final payload = <String, dynamic>{
       "nPayReqId": widget.isEditMode ? _editingPayReqId : 0,
@@ -1287,7 +1292,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       "taxDtl": taxDtl,
       "cComment": _commentController.text.trim(),
       "cAttachment": _attachmentValueForSave,
-      "cStatus": _editingStatus.isEmpty ? "Requested" : _editingStatus,
+      "cStatus": saveStatus,
       "nProjectId": _selectedProjectId,
       "nCompanyId": companyId,
       "nUserActionId": userActionId,
@@ -2563,6 +2568,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
   final String tds;
   final String tax;
   final String payable;
+  final String saveButtonLabel;
   final bool isSaving;
   final VoidCallback onSave;
 
@@ -2571,6 +2577,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
     required this.tds,
     required this.tax,
     required this.payable,
+    required this.saveButtonLabel,
     required this.isSaving,
     required this.onSave,
   });
@@ -2578,6 +2585,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final buttonWidth = saveButtonLabel.length > 6 ? 120.0 : 90.0;
     return Container(
       padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
       decoration: const BoxDecoration(
@@ -2619,7 +2627,7 @@ class _CreateRequestSummaryBar extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
-              width: 90,
+              width: buttonWidth,
               height: 36,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -2640,9 +2648,12 @@ class _CreateRequestSummaryBar extends StatelessWidget {
                           ),
                         ),
                       )
-                    : const Text(
-                        "Save",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
+                    : Text(
+                        saveButtonLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
                       ),
               ),
             ),
