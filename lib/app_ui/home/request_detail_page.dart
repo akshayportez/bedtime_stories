@@ -778,78 +778,117 @@ class _TaxTable extends StatelessWidget {
 
   const _TaxTable({this.taxes = const []});
 
+  static const Color _lineColor = Color(0xFF98D5F9);
+  static const Color _headerColor = Color(0xFFA9CFE6);
+
+  Widget _cell({
+    required String text,
+    required bool isHeader,
+    required EdgeInsetsGeometry padding,
+  }) {
+    return Padding(
+      padding: padding,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: isHeader ? 13 : 14,
+          fontWeight: isHeader ? FontWeight.w500 : FontWeight.w400,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow({
+    required String name,
+    required String rate,
+    required bool isHeader,
+    bool showTopDivider = false,
+  }) {
+    final rowHeight = isHeader ? 40.0 : 36.0;
+    return Container(
+      height: rowHeight,
+      decoration: BoxDecoration(
+        color: isHeader ? _headerColor : Colors.white,
+        border: showTopDivider
+            ? const Border(
+                top: BorderSide(color: _lineColor, width: 0.6),
+              )
+            : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: _cell(
+              text: name,
+              isHeader: isHeader,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+          Container(
+            width: 0.8,
+            color: _lineColor,
+          ),
+          Expanded(
+            child: _cell(
+              text: rate,
+              isHeader: isHeader,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: const Color(0xFFBBE3FA),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: const [
-              Expanded(
-                child: Text(
-                  "Tax Name",
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
+    final rows = taxes.isEmpty
+        ? const <Map<String, String>>[
+            {"name": "-", "rate": "-"},
+          ]
+        : taxes
+            .map(
+              (tax) => {
+                "name": tax.cTaxName,
+                "rate": "${tax.nTaxRate} %",
+              },
+            )
+            .toList();
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth > 320 ? 320.0 : constraints.maxWidth;
+          return SizedBox(
+            width: width,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: _lineColor, width: 1),
               ),
-              Expanded(
-                child: Text(
-                  "Tax Rate %",
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildRow(
+                    name: "Tax Name",
+                    rate: "Tax Rate %",
+                    isHeader: true,
+                  ),
+                  for (var i = 0; i < rows.length; i++)
+                    _buildRow(
+                      name: rows[i]["name"] ?? "-",
+                      rate: rows[i]["rate"] ?? "-",
+                      isHeader: false,
+                      showTopDivider: true,
+                    ),
+                ],
               ),
-            ],
-          ),
-        ),
-        if (taxes.isEmpty)
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF98D5F9)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: const Row(
-              children: [
-                Expanded(child: Text("-", style: TextStyle(fontSize: 14))),
-                Expanded(child: Text("-", style: TextStyle(fontSize: 14))),
-              ],
-            ),
-          ),
-        for (final tax in taxes)
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF98D5F9)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Text(
-                      tax.cTaxName,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Text(
-                      "${tax.nTaxRate} %",
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }

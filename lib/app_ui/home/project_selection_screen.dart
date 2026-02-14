@@ -23,7 +23,7 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F8F8),
+      backgroundColor:  Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -208,7 +208,7 @@ class _ProjectTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         decoration: BoxDecoration(
-          color: const Color(0xE8ECF1FB),
+          color: const Color.fromRGBO(236, 241, 251, 0.91),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFFB7CBEF)),
         ),
