@@ -713,7 +713,7 @@ class _DetailField extends StatelessWidget {
   final String label;
   final String value;
   final bool showArrow;
-  final bool leadingDot;
+  // final bool leadingDot;
   final bool multiline;
   final double height;
 
@@ -721,7 +721,7 @@ class _DetailField extends StatelessWidget {
     required this.label,
     required this.value,
     this.showArrow = false,
-    this.leadingDot = false,
+    // this.leadingDot = false,
     this.multiline = false,
     this.height = 48,
   });
@@ -751,16 +751,16 @@ class _DetailField extends StatelessWidget {
                 ? CrossAxisAlignment.start
                 : CrossAxisAlignment.center,
             children: [
-              if (leadingDot)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(right: 8, top: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0096FB),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+              // if (leadingDot)
+              //   Container(
+              //     width: 8,
+              //     height: 8,
+              //     margin: const EdgeInsets.only(right: 8, top: 4),
+              //     decoration: BoxDecoration(
+              //       color: const Color(0xFF0096FB),
+              //       borderRadius: BorderRadius.circular(2),
+              //     ),
+              //   ),
               Expanded(
                 child: Text(
                   value,

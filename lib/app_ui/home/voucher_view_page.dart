@@ -18,6 +18,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   bool _isDeleting = false;
   bool _isSuccessDialogVisible = false;
   bool _isSharingPdf = false;
+  bool _isPrintingPdf = false;
 
   String _money(double value) => value.toStringAsFixed(2);
   int _resolveInt(dynamic value, {int fallback = 0}) {
@@ -336,7 +337,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     return '${baseName}_$now.pdf';
   }
 
-  Future<File> _downloadPdfToTempFile(String pdfUrl) async {
+  Future<Uint8List> _downloadPdfBytes(String pdfUrl) async {
     final uri = Uri.tryParse(pdfUrl);
     if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
       throw Exception('Invalid PDF URL');
@@ -355,16 +356,20 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
       await for (final chunk in response) {
         bytesBuilder.add(chunk);
       }
-
-      final fileName = _buildPdfFileName(pdfUrl);
-      final filePath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
-      final file = File(filePath);
-      await file.writeAsBytes(bytesBuilder.takeBytes(), flush: true);
-      return file;
+      return bytesBuilder.takeBytes();
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<File> _downloadPdfToTempFile(String pdfUrl) async {
+    final pdfBytes = await _downloadPdfBytes(pdfUrl);
+    final fileName = _buildPdfFileName(pdfUrl);
+    final filePath =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
+    final file = File(filePath);
+    await file.writeAsBytes(pdfBytes, flush: true);
+    return file;
   }
 
   Future<void> _shareVoucherPdf({String? pdfUrl}) async {
@@ -404,6 +409,42 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     } finally {
       if (mounted) {
         setState(() => _isSharingPdf = false);
+      }
+    }
+  }
+
+  Future<void> _printVoucherPdf({String? pdfUrl}) async {
+    if (_isPrintingPdf) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isPrintingPdf = true);
+
+    try {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Preparing PDF for print...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
+      final pdfBytes = await _downloadPdfBytes(resolvedPdfUrl);
+      if (!mounted) return;
+
+      await Printing.layoutPdf(
+        name: _buildPdfFileName(resolvedPdfUrl),
+        onLayout: (_) async => pdfBytes,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unable to print PDF: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isPrintingPdf = false);
       }
     }
   }
@@ -670,6 +711,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                             ? null
                             : () => _openEditPage(detail!),
                         onDeleteTap: _showDeleteDialog,
+                        onPrintPdfTap: _isPrintingPdf ? null : _printVoucherPdf,
                         onViewPdfTap: _openVoucherPdf,
                         onSharePdfTap: _isSharingPdf ? null : _shareVoucherPdf,
                         bottomPadding: bottomInset,
@@ -699,6 +741,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
   final String upiApp;
   final VoidCallback? onEditTap;
   final VoidCallback? onDeleteTap;
+  final VoidCallback? onPrintPdfTap;
   final VoidCallback? onViewPdfTap;
   final VoidCallback? onSharePdfTap;
   final double bottomPadding;
@@ -716,6 +759,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.upiApp,
     required this.onEditTap,
     required this.onDeleteTap,
+    required this.onPrintPdfTap,
     required this.onViewPdfTap,
     required this.onSharePdfTap,
     required this.bottomPadding,
@@ -827,7 +871,12 @@ class _VoucherViewSummaryBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const _VoucherActionIcon(assetPath: 'assets/icons/print_icon.png'),
+              GestureDetector(
+                onTap: onPrintPdfTap,
+                child: const _VoucherActionIcon(
+                  assetPath: 'assets/icons/print_icon.png',
+                ),
+              ),
               const SizedBox(width: 10),
               GestureDetector(
                 onTap: onViewPdfTap,
