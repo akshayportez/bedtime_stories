@@ -29,6 +29,27 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
 
   String _money(double value) => value.toStringAsFixed(2);
 
+  Widget _inlineValueBox({required String value}) {
+    return Container(
+      height: 32,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFCCDDEB)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(
+          fontSize: 13,
+          color: Colors.black,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -415,13 +436,19 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                     showArrow: true,
                                   ),
                                   const SizedBox(height: 14),
+                                  const Text(
+                                    "Requested Amount",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       Expanded(
-                                        child: _DetailField(
-                                          label: "Requested Amount",
+                                        child: _inlineValueBox(
                                           value:
                                               "\u20B9 ${_money(requestedAmount)}",
                                         ),
@@ -438,9 +465,9 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _DetailField(
-                                          label: "",
+                                      SizedBox(
+                                        width: 76,
+                                        child: _inlineValueBox(
                                           value: "${_money(tdsPercent)} %",
                                         ),
                                       ),

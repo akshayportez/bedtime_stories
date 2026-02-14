@@ -470,49 +470,67 @@ class _VoucherCard extends StatelessWidget {
               ),
             ),
             Container(
-              height: 39,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+              padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
               decoration: BoxDecoration(
                 color: const Color(0xFFF6F9FC),
-                borderRadius: BorderRadius.circular(9),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(9),
+                  bottomRight: Radius.circular(9),
+                ),
               ),
               child: Row(
                 children: [
-                  Image.asset(
-                    "assets/icons/payment_animation.gif",
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    "Payable Amt : ",
-                    style: TextStyle(fontSize: 12, color: Color(0xFF7F7F7F)),
-                  ),
-                  Flexible(
-                    child: Text(
-                      "\u20B9$amount",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF256DFB),
-                      ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          "assets/icons/payment_animation.gif",
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          "Payable Amt : ",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF7F7F7F),
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            "\u20B9$amount",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF256DFB),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    height: 30,
+                    constraints: const BoxConstraints(minWidth: 84, maxWidth: 108),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD8DDEA),
+                      color: const Color(0xFFC7D5F4),
                       borderRadius: BorderRadius.circular(50),
                     ),
+                    alignment: Alignment.center,
                     child: Text(
                       payMode.trim().isEmpty ? "-" : payMode,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF6A7388),
+                        color: Color(0xFF4A4A4A),
                         fontWeight: FontWeight.w500,
                       ),
                     ),

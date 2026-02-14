@@ -118,7 +118,7 @@ class _ReportCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF2F5F9),
+          color: const Color(0xE8F7F9FE),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0xFFD3DCEA)),
         ),
@@ -126,8 +126,8 @@ class _ReportCard extends StatelessWidget {
           children: [
             Image.asset(
               iconPath,
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               fit: BoxFit.contain,
             ),
             const SizedBox(width: 10),
@@ -135,7 +135,7 @@ class _ReportCard extends StatelessWidget {
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   color: Color(0xFF2D2D2D),
                   fontWeight: FontWeight.w400,
                 ),
@@ -365,7 +365,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCEAF8),
+                  color: const Color(0xFFE5F2FE),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: Column(
@@ -1473,7 +1473,12 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
         actions: [
           IconButton(
             onPressed: _openFilterSheet,
-            icon: const Icon(Icons.filter_alt_outlined, color: Colors.black),
+            icon: Image.asset(
+              "assets/icons/filter.png",
+              width: 18,
+              height: 18,
+              fit: BoxFit.contain,
+            ),
           ),
         ],
       ),
@@ -1481,7 +1486,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: const Color(0xFFF2F6FB),
+            color: const Color(0xFFDDE8F3),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1677,7 +1682,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
                               width: 24,
                               height: 20,
                               decoration: BoxDecoration(
-                                border: Border.all(color: const Color(0xFFCDD6E2)),
+                                border: Border.all(color: const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: IconButton(
@@ -1715,7 +1720,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFFDCEAF8),
+              color: Color(0xFFD5E8FB),
               border: Border(top: BorderSide(color: Color(0xFFCADDF4))),
             ),
             child: Column(
@@ -1724,15 +1729,33 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "TDS : ${_money(totalTds)}",
+                    Text.rich(
+                      TextSpan(
+                        text: "TDS : ",
+                        children: [
+                          TextSpan(
+                            text:
+                                "${String.fromCharCode(8377)}${_money(totalTds)}",
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF2D2D2D),
                       ),
                     ),
-                    Text(
-                      "Tax : ${_money(totalTax)}",
+                    Text.rich(
+                      TextSpan(
+                        text: "Tax : ",
+                        children: [
+                          TextSpan(
+                            text:
+                                "${String.fromCharCode(8377)}${_money(totalTax)}",
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF2D2D2D),
@@ -1950,7 +1973,12 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
         actions: [
           IconButton(
             onPressed: _openFilterSheet,
-            icon: const Icon(Icons.filter_alt_outlined, color: Colors.black),
+            icon: Image.asset(
+              "assets/icons/filter.png",
+              width: 18,
+              height: 18,
+              fit: BoxFit.contain,
+            ),
           ),
         ],
       ),
@@ -2145,7 +2173,7 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
                               width: 24,
                               height: 20,
                               decoration: BoxDecoration(
-                                border: Border.all(color: const Color(0xFFCDD6E2)),
+                                border: Border.all(color: const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: IconButton(
@@ -2183,7 +2211,7 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFFDCEAF8),
+              color: Color(0xFFD5E8FB),
               border: Border(top: BorderSide(color: Color(0xFFCADDF4))),
             ),
             child: Row(
