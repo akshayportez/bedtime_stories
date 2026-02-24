@@ -11,12 +11,29 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
   final TextEditingController searchController = TextEditingController();
 
   final List<String> projects = [];
+  int? _userId;
+
   @override
   void initState() {
     super.initState();
+    _loadProjectsForSavedUser();
+  }
+
+  Future<void> _loadProjectsForSavedUser() async {
+    final userData = await BedtimeLocalStorage.getUserData();
+    final storedUserId = userData["userId"];
+    final userId = storedUserId is int
+        ? storedUserId
+        : int.tryParse(storedUserId?.toString() ?? "") ?? 1;
+
+    if (!mounted) return;
+
+    setState(() {
+      _userId = userId;
+    });
 
     context.read<BedtimeProjectBloc>().add(
-      BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+      BedtimeProjectLoadRequested(companyId: 1, userId: userId),
     );
   }
 
@@ -42,14 +59,27 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
               const SizedBox(height: 30),
 
               /// Search Bar
-              _SearchBar(controller: searchController),
+              _SearchBar(controller: searchController, userId: _userId),
 
               const SizedBox(height: 18),
 
               /// Project List
               Expanded(
                 child: BlocBuilder<BedtimeProjectBloc, BedtimeProjectState>(
+                  buildWhen: (previous, current) {
+                    // Avoid flicker while typing: keep current list visible
+                    // when a search triggers a transient loading state.
+                    if (previous is BedtimeProjectLoaded &&
+                        current is BedtimeProjectLoading) {
+                      return false;
+                    }
+                    return true;
+                  },
                   builder: (context, state) {
+                    if (_userId == null) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
                     if (state is BedtimeProjectLoading) {
                       return const Center(child: CircularProgressIndicator());
                     }
@@ -59,6 +89,24 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                     }
 
                     if (state is BedtimeProjectLoaded) {
+                      final searchText = searchController.text.trim();
+
+                      if (state.projects.isEmpty) {
+                        return Center(
+                          child: Text(
+                            searchText.isNotEmpty
+                                ? 'No project with name "$searchText"'
+                                : "No projects available",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B6B6B),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        );
+                      }
+
                       return ListView.builder(
                         itemCount: state.projects.length,
                         itemBuilder: (context, index) {
@@ -135,8 +183,9 @@ class _PageSubtitle extends StatelessWidget {
 /// Search Bar Widget
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
+  final int? userId;
 
-  const _SearchBar({required this.controller});
+  const _SearchBar({required this.controller, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -144,10 +193,13 @@ class _SearchBar extends StatelessWidget {
       height: 52,
       child: TextFormField(
         onChanged: (value) {
+          final resolvedUserId = userId;
+          if (resolvedUserId == null) return;
+
           context.read<BedtimeProjectBloc>().add(
             BedtimeProjectSearchRequested(
               companyId: 1,
-              userId: 1,
+              userId: resolvedUserId,
               search: value.trim(),
             ),
           );
