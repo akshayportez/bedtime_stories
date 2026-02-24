@@ -5,6 +5,8 @@ class AppTextField extends StatelessWidget {
   final TextEditingController controller;
   final bool obscureText;
   final Widget? suffixIcon;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   const AppTextField({
     super.key,
@@ -12,6 +14,8 @@ class AppTextField extends StatelessWidget {
     required this.controller,
     this.obscureText = false,
     this.suffixIcon,
+    this.errorText,
+    this.onChanged,
   });
 
   @override
@@ -30,6 +34,7 @@ class AppTextField extends StatelessWidget {
         /// Input Field
         TextField(
           controller: controller,
+          onChanged: onChanged,
           obscureText: obscureText,
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(
@@ -37,6 +42,7 @@ class AppTextField extends StatelessWidget {
               vertical: 14,
             ),
             suffixIcon: suffixIcon,
+            errorText: errorText,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFCCDDEB)),
@@ -48,6 +54,14 @@ class AppTextField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFF2D8CFF)),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red),
             ),
           ),
         ),

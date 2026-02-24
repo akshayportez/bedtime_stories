@@ -12,6 +12,24 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   bool isPasswordVisible = false;
+  String? usernameError;
+  String? passwordError;
+
+  void _validateAndLogin() {
+    final username = usernameController.text.trim();
+    final password = passwordController.text.trim();
+
+    setState(() {
+      usernameError = username.isEmpty ? "Please enter your username" : null;
+      passwordError = password.isEmpty ? "Please enter your password" : null;
+    });
+
+    if (usernameError != null || passwordError != null) return;
+
+    context.read<BedtimeLoginBloc>().add(
+      BedtimeLoginRequested(username, password),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +41,8 @@ class _LoginScreenState extends State<LoginScreen> {
           width: screenWidth,
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
           color: Colors.white,
-          child: BlocListener<BedtimeLoginBloc, BedtimeLoginState>(
+          child: BlocConsumer<BedtimeLoginBloc, BedtimeLoginState>(
             listener: (context, state) {
-              if (state is BedtimeLoginLoading) {
-                // show loader
-              }
-
               if (state is BedtimeLoginSuccess) {
                 Navigator.pushReplacementNamed(context, "/projectSelection");
 
@@ -41,74 +55,107 @@ class _LoginScreenState extends State<LoginScreen> {
               }
             },
 
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  "Login",
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.w600),
-                ),
+            builder: (context, state) {
+              final isLoading = state is BedtimeLoginLoading;
 
-                const SizedBox(height: 10),
+              return Stack(
+                children: [
+                  AbsorbPointer(
+                    absorbing: isLoading,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          "Login",
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
 
-                const Text(
-                  "Please enter your username and password\nto log in.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0XFF6B6B6B),
-                    fontWeight: FontWeight.w400,
-                    height: 1.9,
-                  ),
-                ),
+                        const SizedBox(height: 10),
 
-                const SizedBox(height: 30),
+                        const Text(
+                          "Please enter your username and password\nto log in.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0XFF6B6B6B),
+                            fontWeight: FontWeight.w400,
+                            height: 1.9,
+                          ),
+                        ),
 
-                /// Username Field
-                AppTextField(
-                  label: "User Name",
-                  controller: usernameController,
-                ),
+                        const SizedBox(height: 30),
 
-                const SizedBox(height: 18),
+                        /// Username Field
+                        AppTextField(
+                          label: "User Name",
+                          controller: usernameController,
+                          errorText: usernameError,
+                          onChanged: (value) {
+                            if (usernameError == null) return;
+                            setState(() {
+                              usernameError = value.trim().isEmpty
+                                  ? "Please enter your username"
+                                  : null;
+                            });
+                          },
+                        ),
 
-                /// Password Field
-                AppTextField(
-                  label: "Password",
-                  controller: passwordController,
-                  obscureText: !isPasswordVisible,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      size: 18,
-                      color: Colors.black54,
+                        const SizedBox(height: 18),
+
+                        /// Password Field
+                        AppTextField(
+                          label: "Password",
+                          controller: passwordController,
+                          errorText: passwordError,
+                          onChanged: (value) {
+                            if (passwordError == null) return;
+                            setState(() {
+                              passwordError = value.trim().isEmpty
+                                  ? "Please enter your password"
+                                  : null;
+                            });
+                          },
+                          obscureText: !isPasswordVisible,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              size: 18,
+                              color: Colors.black54,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 26),
+
+                        /// Login Button
+                        AppButton(
+                          text: "Login",
+                          onPressed: _validateAndLogin,
+                        ),
+                      ],
                     ),
-                    onPressed: () {
-                      setState(() {
-                        isPasswordVisible = !isPasswordVisible;
-                      });
-                    },
                   ),
-                ),
-
-                const SizedBox(height: 26),
-
-                /// Login Button
-                AppButton(
-                  text: "Login",
-                  onPressed: () {
-                    context.read<BedtimeLoginBloc>().add(
-                      BedtimeLoginRequested(
-                        usernameController.text.trim(),
-                        passwordController.text.trim(),
+                  if (isLoading)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.white.withOpacity(0.65),
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(),
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),
