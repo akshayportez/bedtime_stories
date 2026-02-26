@@ -295,7 +295,7 @@ class _VoucherEditPageState extends State<VoucherEditPage> {
     final isSavingVoucher = voucherSaveState is BedtimePaymentVoucherSaving;
     final bankListState = context.watch<BedtimeGetBankListBloc>().state;
     final bankItems = bankListState is BedtimeGetBankListLoaded
-        ? bankListState.banks
+        ? bankListState.banks.where((bank) => bank.bActive).toList()
         : <BedtimeGetBankList>[];
     final bankHint = bankListState is BedtimeGetBankListLoading
         ? "Loading banks..."
@@ -350,6 +350,40 @@ class _VoucherEditPageState extends State<VoucherEditPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "Voucher No : ${(request.cVoucherNo ?? "").isEmpty ? request.cRequestNo : (request.cVoucherNo ?? "")}",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    request.cVoucherDateTime ??
+                                        request.cRequestDateTime ??
+                                        "",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
                             _ApprovalInfoCard(
                               account: reqHdr.cAccountName.isNotEmpty
                                   ? reqHdr.cAccountName
@@ -389,21 +423,27 @@ class _VoucherEditPageState extends State<VoucherEditPage> {
                             const SizedBox(height: 6),
                             _ApprovalTaxTable(taxes: taxes),
                             const SizedBox(height: 8),
-                            const Text(
-                              "Comment",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              reqHdr.cComment.isEmpty ? "-" : reqHdr.cComment,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.3,
-                                color: Color(0xFF444444),
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  const TextSpan(
+                                    text: "Comment ",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        reqHdr.cComment.isEmpty ? "-" : reqHdr.cComment,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      height: 1.3,
+                                      color: Color(0xFF444444),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 14),

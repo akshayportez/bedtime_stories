@@ -90,8 +90,11 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
 
                     if (state is BedtimeProjectLoaded) {
                       final searchText = searchController.text.trim();
+                      final activeProjects = state.projects
+                          .where((project) => project.bActive)
+                          .toList();
 
-                      if (state.projects.isEmpty) {
+                      if (activeProjects.isEmpty) {
                         return Center(
                           child: Text(
                             searchText.isNotEmpty
@@ -108,13 +111,13 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                       }
 
                       return ListView.builder(
-                        itemCount: state.projects.length,
+                        itemCount: activeProjects.length,
                         itemBuilder: (context, index) {
+                          final project = activeProjects[index];
                           return _ProjectTile(
-                            title: state.projects[index].cProjectName,
+                            title: project.cProjectName,
 
                             onTap: () async {
-                              final project = state.projects[index];
 
                               /// ✅ Save Selected Project
                               await BedtimeLocalStorage.saveSelectedProject(

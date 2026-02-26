@@ -134,11 +134,11 @@ class BedtimeGradientAppBar extends StatelessWidget
                     const Spacer(),
                     InkWell(
                       onTap: () => Navigator.of(dialogContext).pop(false),
-                      child: const Icon(Icons.close, size: 38, color: Colors.black),
+                      child: const Icon(Icons.close, size: 28, color: Colors.black),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                // const SizedBox(height: 14),
                 const Text(
                   "Come back soon!",
                   style: TextStyle(
@@ -267,16 +267,22 @@ class BedtimeGradientAppBar extends StatelessWidget
                       const SizedBox(width: 6),
 
                       /// Project Name
-                      FutureBuilder(
-                        future: BedtimeLocalStorage.getSelectedProjectName(),
-                        builder: (context, snapshot) {
-                          return Text(
-                            snapshot.data ?? "",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF174A98),
-                            ),
+                      ValueListenableBuilder<int>(
+                        valueListenable:
+                            BedtimeLocalStorage.selectedProjectChangeNotifier,
+                        builder: (context, _, __) {
+                          return FutureBuilder<String>(
+                            future: BedtimeLocalStorage.getSelectedProjectName(),
+                            builder: (context, snapshot) {
+                              return Text(
+                                snapshot.data ?? "",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF174A98),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

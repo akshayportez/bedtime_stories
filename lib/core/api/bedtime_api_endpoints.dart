@@ -6,6 +6,7 @@ class BedtimeApiEndpoints {
   static const String taxList = "/Tax";
   static const String categoryList = "/Category";
   static const String sectionList = "/Section";
+  static const String userList = "/Users";
   static const String paymentRequest = "/PaymentRequest";
   static const String paymentVoucher = "/PaymentVoucher";
   static const String paymentRequestReportGet = "/PaymentRequestReport/get";
@@ -13,6 +14,7 @@ class BedtimeApiEndpoints {
   static const String paymentRequestSave = "/PaymentRequest/save";
   static const String paymentVoucherSave = "/PaymentVoucher/save";
   static const String paymentVoucherByRequest = "/PaymentVoucher/by-request";
+  static const String paymentVoucherPdf = "/PaymentVoucher/pdf";
   static const String voucherReportGet = "/VoucherReport/get";
   static const String requestApprove = "/PaymentApproval/approve";
   static const String requestReject = "/PaymentApproval/reject";

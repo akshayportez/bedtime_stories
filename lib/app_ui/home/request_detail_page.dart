@@ -29,10 +29,14 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
 
   String _money(double value) => value.toStringAsFixed(2);
 
-  Widget _inlineValueBox({required String value}) {
+  Widget _inlineValueBox({
+    required String value,
+    AlignmentGeometry alignment = Alignment.center,
+    TextAlign textAlign = TextAlign.center,
+  }) {
     return Container(
       height: 32,
-      alignment: Alignment.center,
+      alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -41,6 +45,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
       ),
       child: Text(
         value,
+        textAlign: textAlign,
         style: const TextStyle(
           fontSize: 13,
           color: Colors.black,
@@ -298,7 +303,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     RichText(
                       text: TextSpan(
                         style: const TextStyle(fontSize: 12, color: Colors.black),
@@ -379,7 +384,15 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                       final payableAmount =
                           detail?.nPayableAmount ?? request.nPayableAmount;
                       final comment = detail?.cComment ?? "";
-                      final isTaxable = detail?.bTaxable ?? false;
+                      final visibleTaxes = taxes
+                          .where(
+                            (tax) =>
+                                tax.cTaxName.trim().isNotEmpty &&
+                                tax.nTaxRate > 0,
+                          )
+                          .toList();
+                      final hasTaxDetails = visibleTaxes.isNotEmpty;
+                      final hasTds = tdsPercent > 0 || tdsAmount > 0;
                       final attachments = _attachmentList(
                         detail?.cAttachment ?? "",
                       );
@@ -451,10 +464,12 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                         child: _inlineValueBox(
                                           value:
                                               "\u20B9 ${_money(requestedAmount)}",
+                                          alignment: Alignment.centerRight,
+                                          textAlign: TextAlign.right,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
-                                      const _BlueCheckBox(),
+                                      _BlueCheckBox(isChecked: hasTds),
                                       const SizedBox(width: 6),
                                       const Text(
                                         "TDS",
@@ -476,19 +491,21 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                   const SizedBox(height: 10),
                                   Row(
                                     children: [
-                                      const _BlueCheckBox(),
+                                      _BlueCheckBox(isChecked: hasTaxDetails),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        isTaxable ? "Taxable" : "Non Taxable",
-                                        style: const TextStyle(
+                                      const Text(
+                                        "Taxable",
+                                        style: TextStyle(
                                           fontSize: 13,
                                           color: Colors.black,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  _TaxTable(taxes: taxes),
+                                  if (hasTaxDetails) ...[
+                                    const SizedBox(height: 8),
+                                    _TaxTable(taxes: visibleTaxes),
+                                  ],
                                   const SizedBox(height: 14),
                                   _DetailField(
                                     label: "Comment",
@@ -780,7 +797,9 @@ class _DetailField extends StatelessWidget {
 }
 
 class _BlueCheckBox extends StatelessWidget {
-  const _BlueCheckBox();
+  final bool isChecked;
+
+  const _BlueCheckBox({this.isChecked = true});
 
   @override
   Widget build(BuildContext context) {
@@ -788,14 +807,17 @@ class _BlueCheckBox extends StatelessWidget {
       width: 22,
       height: 22,
       decoration: BoxDecoration(
-        color: const Color(0xFF0096FB),
+        color: isChecked ? const Color(0xFF0096FB) : Colors.white,
+        border: Border.all(color: const Color(0xFF0096FB)),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: const Icon(
-        Icons.check,
-        size: 16,
-        color: Colors.white,
-      ),
+      child: isChecked
+          ? const Icon(
+              Icons.check,
+              size: 16,
+              color: Colors.white,
+            )
+          : null,
     );
   }
 }
@@ -871,18 +893,21 @@ class _TaxTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = taxes.isEmpty
-        ? const <Map<String, String>>[
-            {"name": "-", "rate": "-"},
-          ]
-        : taxes
-            .map(
-              (tax) => {
-                "name": tax.cTaxName,
-                "rate": "${tax.nTaxRate} %",
-              },
-            )
-            .toList();
+    final validTaxes = taxes
+        .where((tax) => tax.cTaxName.trim().isNotEmpty && tax.nTaxRate > 0)
+        .toList();
+    if (validTaxes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final rows = validTaxes
+        .map(
+          (tax) => {
+            "name": tax.cTaxName,
+            "rate": "${tax.nTaxRate} %",
+          },
+        )
+        .toList();
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -1071,37 +1096,53 @@ class _RequestAttachmentTileState extends State<_RequestAttachmentTile> {
 
   Future<void> _resolveSize() async {
     if (widget.imageUrl.isEmpty || widget.formatBytes == null) return;
+    final bytes = await _fetchRemoteFileSizeBytes(widget.imageUrl);
+    if (!mounted) return;
+    setState(() {
+      _resolvedSize = widget.formatBytes!(bytes);
+    });
+  }
+
+  Future<int> _fetchRemoteFileSizeBytes(String url) async {
+    final client = HttpClient();
     try {
-      final provider = NetworkImage(widget.imageUrl);
-      final stream = provider.resolve(const ImageConfiguration());
-      final completer = Completer<int>();
-      late final ImageStreamListener listener;
-      listener = ImageStreamListener(
-        (_, __) {},
-        onChunk: (chunk) {
-          if (!completer.isCompleted &&
-              chunk.expectedTotalBytes != null &&
-              chunk.expectedTotalBytes! > 0) {
-            completer.complete(chunk.expectedTotalBytes!);
-            stream.removeListener(listener);
-          }
-        },
-        onError: (_, __) {
-          if (!completer.isCompleted) completer.complete(0);
-          stream.removeListener(listener);
-        },
+      final uri = Uri.parse(url);
+
+      try {
+        final headRequest = await client
+            .headUrl(uri)
+            .timeout(const Duration(seconds: 6));
+        final headResponse = await headRequest.close().timeout(
+          const Duration(seconds: 6),
+        );
+        final contentLength = headResponse.contentLength;
+        await headResponse.drain<void>();
+        if (contentLength > 0) return contentLength;
+      } catch (_) {
+        // Some servers reject HEAD. Fall back to GET.
+      }
+
+      final getRequest = await client.getUrl(uri).timeout(
+        const Duration(seconds: 6),
       );
-      stream.addListener(listener);
-      final bytes = await completer.future.timeout(
-        const Duration(seconds: 4),
-        onTimeout: () => 0,
+      final getResponse = await getRequest.close().timeout(
+        const Duration(seconds: 8),
       );
-      if (!mounted || bytes <= 0) return;
-      setState(() {
-        _resolvedSize = widget.formatBytes!(bytes);
-      });
+      final contentLength = getResponse.contentLength;
+      if (contentLength > 0) {
+        await getResponse.drain<void>();
+        return contentLength;
+      }
+
+      var totalBytes = 0;
+      await for (final chunk in getResponse) {
+        totalBytes += chunk.length;
+      }
+      return totalBytes;
     } catch (_) {
-      // Keep fallback text.
+      return 0;
+    } finally {
+      client.close(force: true);
     }
   }
 
@@ -1260,8 +1301,8 @@ class _RequestSummaryBar extends StatelessWidget {
                     GestureDetector(
                       onTap: onEdit,
                       child: Container(
-                        width: 47,
-                        height: 47,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           border: Border.all(color: Colors.black),
@@ -1278,8 +1319,8 @@ class _RequestSummaryBar extends StatelessWidget {
                      GestureDetector(
                       onTap: onDelete,
                       child: Container(
-                        width: 47,
-                        height: 47,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
                           color: Colors.black,
                           borderRadius: BorderRadius.circular(6),

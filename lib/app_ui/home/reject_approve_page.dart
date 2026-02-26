@@ -333,7 +333,7 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                   _ApprovalTaxTable(taxes: taxes),
                                   const SizedBox(height: 8),
                                   const Text(
-                                    'Comments',
+                                    'Comments :',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,

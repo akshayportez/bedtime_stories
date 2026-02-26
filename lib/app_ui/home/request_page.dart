@@ -10,7 +10,7 @@ class RequestPage extends StatefulWidget {
 class _RequestPageState extends State<RequestPage> {
   final TextEditingController _searchController = TextEditingController();
   int _projectId = 0;
-  int _userActionId = 0;
+  int? _userActionId;
   String _statusFilter = "";
   String _dFrom = "";
   String _dTo = "";
@@ -18,37 +18,58 @@ class _RequestPageState extends State<RequestPage> {
   @override
   void initState() {
     super.initState();
+    BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
+      _handleSelectedProjectChanged,
+    );
     _loadRequests();
   }
 
   @override
   void dispose() {
+    BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
+      _handleSelectedProjectChanged,
+    );
     _searchController.dispose();
     super.dispose();
   }
 
+  void _handleSelectedProjectChanged() {
+    unawaited(_syncProjectIdFromStorage());
+  }
+
+  Future<void> _syncProjectIdFromStorage() async {
+    _projectId = await BedtimeLocalStorage.getSelectedProjectId();
+  }
+
   Future<void> _loadRequests() async {
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue = userData["userId"];
+    final userIdValue = await _getStoredUserId();
     _projectId = projectId;
-    _userActionId = userIdValue is int
-        ? userIdValue
-        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+    _userActionId = userIdValue;
 
     if (!mounted) return;
+    if (_userActionId == null) return;
 
     context.read<BedtimePaymentRequestBloc>().add(
           BedtimePaymentRequestLoadRequested(
             companyId: 1,
             projectId: projectId,
-            userActionId: _userActionId,
+            userActionId: _userActionId!,
             search: "",
             statusFilter: _statusFilter,
             dFrom: _dFrom,
             dTo: _dTo,
           ),
         );
+  }
+
+  Future<int?> _getStoredUserId() async {
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userIdValue = userData["userId"];
+    final resolved = userIdValue is int
+        ? userIdValue
+        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+    return resolved > 0 ? resolved : null;
   }
 
   Future<void> _openProjectSelectionSheet() async {
@@ -69,19 +90,16 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _onSearchChanged(String value) {
-    if (_userActionId == 0) {
-      BedtimeLocalStorage.getUserData().then((userData) {
+    if (_userActionId == null) {
+      _getStoredUserId().then((resolvedUserId) {
         if (!mounted) return;
-        final userIdValue = userData["userId"];
-        final resolvedUserId = userIdValue is int
-            ? userIdValue
-            : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+        if (resolvedUserId == null) return;
         _userActionId = resolvedUserId;
         context.read<BedtimePaymentRequestBloc>().add(
               BedtimePaymentRequestSearchRequested(
                 companyId: 1,
                 projectId: _projectId,
-                userActionId: _userActionId,
+                userActionId: _userActionId!,
                 search: value.trim(),
                 statusFilter: _statusFilter,
                 dFrom: _dFrom,
@@ -92,11 +110,14 @@ class _RequestPageState extends State<RequestPage> {
       return;
     }
 
+    final resolvedUserId = _userActionId;
+    if (resolvedUserId == null) return;
+
     context.read<BedtimePaymentRequestBloc>().add(
           BedtimePaymentRequestSearchRequested(
             companyId: 1,
             projectId: _projectId,
-            userActionId: _userActionId,
+            userActionId: resolvedUserId,
             search: value.trim(),
             statusFilter: _statusFilter,
             dFrom: _dFrom,
@@ -358,13 +379,12 @@ class _ProjectSelectionBottomSheet extends StatefulWidget {
 class _ProjectSelectionBottomSheetState
     extends State<_ProjectSelectionBottomSheet> {
   final TextEditingController _searchController = TextEditingController();
+  int? _userId;
 
   @override
   void initState() {
     super.initState();
-    context.read<BedtimeProjectBloc>().add(
-          BedtimeProjectLoadRequested(companyId: 1, userId: 1),
-        );
+    _loadProjectsForSavedUser();
   }
 
   @override
@@ -374,12 +394,33 @@ class _ProjectSelectionBottomSheetState
   }
 
   void _onSearchChanged(String value) {
+    final resolvedUserId = _userId;
+    if (resolvedUserId == null) return;
+
     context.read<BedtimeProjectBloc>().add(
           BedtimeProjectSearchRequested(
             companyId: 1,
-            userId: 1,
+            userId: resolvedUserId,
             search: value.trim(),
           ),
+        );
+  }
+
+  Future<void> _loadProjectsForSavedUser() async {
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userIdValue = userData["userId"];
+    final resolvedUserId = userIdValue is int
+        ? userIdValue
+        : int.tryParse(userIdValue?.toString() ?? "") ?? 1;
+
+    if (!mounted) return;
+
+    setState(() {
+      _userId = resolvedUserId;
+    });
+
+    context.read<BedtimeProjectBloc>().add(
+          BedtimeProjectLoadRequested(companyId: 1, userId: resolvedUserId),
         );
   }
 
@@ -485,15 +526,19 @@ class _ProjectSelectionBottomSheetState
                     }
 
                     if (state is BedtimeProjectLoaded) {
-                      if (state.projects.isEmpty) {
+                      final activeProjects = state.projects
+                          .where((project) => project.bActive)
+                          .toList();
+
+                      if (activeProjects.isEmpty) {
                         return const Center(child: Text("No projects found"));
                       }
 
                       return ListView.builder(
                         shrinkWrap: true,
-                        itemCount: state.projects.length,
+                        itemCount: activeProjects.length,
                         itemBuilder: (context, index) {
-                          final project = state.projects[index];
+                          final project = activeProjects[index];
                           return _BottomSheetProjectTile(
                             title: project.cProjectName,
                             onTap: () async {
@@ -592,10 +637,10 @@ class _RequestFilterBottomSheetState extends State<_RequestFilterBottomSheet> {
   }
 
   String _formatDate(DateTime date) {
-    final y = date.year.toString().padLeft(4, "0");
+    final y = (date.year % 100).toString().padLeft(2, "0");
     final m = date.month.toString().padLeft(2, "0");
     final d = date.day.toString().padLeft(2, "0");
-    return "$y-$m-$d";
+    return "$d/$m/$y";
   }
 
   void _onCalendarDateChanged(DateTime date) {

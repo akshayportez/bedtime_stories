@@ -1,10 +1,17 @@
 import 'dart:convert';
 import 'package:bedtime_stories/app_ui/login/models/bedtime_login_response.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BedtimeLocalStorage {
   static const _userData = "login_user";
   static const _menuRights = "menu_rights";
+  static final ValueNotifier<int> selectedProjectChangeNotifier =
+      ValueNotifier<int>(0);
+
+  static void _notifySelectedProjectChanged() {
+    selectedProjectChangeNotifier.value++;
+  }
 
   /// ✅ Save Login User Session
   static Future<void> saveLoginUser(BedtimeLoginResponse response) async {
@@ -56,10 +63,11 @@ class BedtimeLocalStorage {
   final prefs = await SharedPreferences.getInstance();
 
   await prefs.remove(_userData);
-  await prefs.remove(_menuRights);
+ await prefs.remove(_menuRights);
 
   await prefs.remove(_selectedProjectId);
   await prefs.remove(_selectedProjectName);
+  _notifySelectedProjectChanged();
 }
 
   static const _selectedProjectId = "selected_project_id";
@@ -74,6 +82,7 @@ static Future<void> saveSelectedProject({
 
   await prefs.setInt(_selectedProjectId, projectId);
   await prefs.setString(_selectedProjectName, projectName);
+  _notifySelectedProjectChanged();
 }
 
 /// ✅ Get Selected Project Name
@@ -93,6 +102,7 @@ static Future<void> clearSelectedProject() async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.remove(_selectedProjectId);
   await prefs.remove(_selectedProjectName);
+  _notifySelectedProjectChanged();
 }
 /// ✅ Get Logged Username
 static Future<String> getUserName() async {

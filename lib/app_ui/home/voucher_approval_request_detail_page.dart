@@ -14,6 +14,10 @@ class VoucherApprovalRequestDetailPage extends StatefulWidget {
 
 class _VoucherApprovalRequestDetailPageState
     extends State<VoucherApprovalRequestDetailPage> {
+  static const int _upiTransactionIdMaxLength = 35;
+  static const int _upiAppMaxLength = 50;
+  static final RegExp _upiTransactionIdPattern = RegExp(r"^[A-Za-z0-9]+$");
+
   bool _showApprovedDetails = false;
   _VoucherPaymentMode _paymentMode = _VoucherPaymentMode.cash;
   int? _selectedBankId;
@@ -22,6 +26,11 @@ class _VoucherApprovalRequestDetailPageState
   final TextEditingController _chequeNumberController = TextEditingController();
   final TextEditingController _transactionIdController = TextEditingController();
   final TextEditingController _upiAppController = TextEditingController();
+  String? _bankFieldError;
+  String? _chequeNumberFieldError;
+  String? _chequeDateFieldError;
+  String? _transactionIdFieldError;
+  String? _upiAppFieldError;
 
   String _money(double value) => value.toStringAsFixed(2);
   int _resolveInt(dynamic value, {int fallback = 0}) {
@@ -86,7 +95,10 @@ class _VoucherApprovalRequestDetailPageState
       lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
-    setState(() => _chequeDate = picked);
+    setState(() {
+      _chequeDate = picked;
+      _chequeDateFieldError = null;
+    });
   }
 
   String _formatDate(DateTime date) {
@@ -113,10 +125,88 @@ class _VoucherApprovalRequestDetailPageState
     }
   }
 
-  void _showValidation(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  void _clearInlineValidationErrors() {
+    _bankFieldError = null;
+    _chequeNumberFieldError = null;
+    _chequeDateFieldError = null;
+    _transactionIdFieldError = null;
+    _upiAppFieldError = null;
+  }
+
+  void _changePaymentMode(_VoucherPaymentMode mode) {
+    setState(() {
+      _paymentMode = mode;
+      _clearInlineValidationErrors();
+    });
+  }
+
+  bool _validateVoucherInline() {
+    String? bankFieldError;
+    String? chequeNumberFieldError;
+    String? chequeDateFieldError;
+    String? transactionIdFieldError;
+    String? upiAppFieldError;
+
+    if (_paymentMode == _VoucherPaymentMode.bank && _selectedBankId == null) {
+      bankFieldError = "Bank name is required";
+    }
+
+    if (_paymentMode == _VoucherPaymentMode.cheque) {
+      final chequeNumber = _chequeNumberController.text.trim();
+      if (chequeNumber.isEmpty) {
+        chequeNumberFieldError = "Cheque number is required";
+      } else if (chequeNumber.length != 6) {
+        chequeNumberFieldError = "Cheque number must be 6 digits";
+      }
+      if (_chequeDate == null) {
+        chequeDateFieldError = "Cheque date is required";
+      }
+      if (_selectedBankId == null) {
+        bankFieldError = "Bank name is required";
+      }
+    }
+
+    if (_paymentMode == _VoucherPaymentMode.upi) {
+      final transactionId = _transactionIdController.text.trim();
+      final upiApp = _upiAppController.text.trim();
+
+      if (transactionId.isEmpty) {
+        transactionIdFieldError = "Transaction id is required";
+      } else if (transactionId.length > _upiTransactionIdMaxLength) {
+        transactionIdFieldError =
+            "Transaction id must be at most $_upiTransactionIdMaxLength characters";
+      } else if (!_upiTransactionIdPattern.hasMatch(transactionId)) {
+        transactionIdFieldError =
+            "Transaction id must contain only letters and numbers";
+      }
+
+      if (upiApp.isEmpty) {
+        upiAppFieldError = "UPI app is required";
+      } else if (upiApp.length > _upiAppMaxLength) {
+        upiAppFieldError = "UPI app must be at most $_upiAppMaxLength characters";
+      }
+    }
+
+    final hasErrors =
+        bankFieldError != null ||
+        chequeNumberFieldError != null ||
+        chequeDateFieldError != null ||
+        transactionIdFieldError != null ||
+        upiAppFieldError != null;
+
+    if (hasErrors) {
+      setState(() {
+        _bankFieldError = bankFieldError;
+        _chequeNumberFieldError = chequeNumberFieldError;
+        _chequeDateFieldError = chequeDateFieldError;
+        _transactionIdFieldError = transactionIdFieldError;
+        _upiAppFieldError = upiAppFieldError;
+      });
+      return false;
+    }
+
+    _clearInlineValidationErrors();
+    return true;
   }
 
   Future<void> _showSaveSuccessDialog() async {
@@ -174,35 +264,8 @@ class _VoucherApprovalRequestDetailPageState
   }
 
   Future<void> _saveVoucher() async {
-    if (_paymentMode == _VoucherPaymentMode.bank && _selectedBankId == null) {
-      _showValidation("Please select bank");
+    if (!_validateVoucherInline()) {
       return;
-    }
-
-    if (_paymentMode == _VoucherPaymentMode.cheque) {
-      if (_chequeNumberController.text.trim().isEmpty) {
-        _showValidation("Please enter cheque number");
-        return;
-      }
-      if (_chequeDate == null) {
-        _showValidation("Please select cheque date");
-        return;
-      }
-      if (_selectedBankId == null) {
-        _showValidation("Please select bank");
-        return;
-      }
-    }
-
-    if (_paymentMode == _VoucherPaymentMode.upi) {
-      if (_transactionIdController.text.trim().isEmpty) {
-        _showValidation("Please enter transaction id");
-        return;
-      }
-      if (_upiAppController.text.trim().isEmpty) {
-        _showValidation("Please enter UPI app");
-        return;
-      }
     }
 
     final userData = await BedtimeLocalStorage.getUserData();
@@ -270,7 +333,7 @@ class _VoucherApprovalRequestDetailPageState
     final isSavingVoucher = voucherSaveState is BedtimePaymentVoucherSaving;
     final bankListState = context.watch<BedtimeGetBankListBloc>().state;
     final bankItems = bankListState is BedtimeGetBankListLoaded
-        ? bankListState.banks
+        ? bankListState.banks.where((bank) => bank.bActive).toList()
         : <BedtimeGetBankList>[];
     final bankHint = bankListState is BedtimeGetBankListLoading
         ? "Loading banks..."
@@ -406,8 +469,21 @@ class _VoucherApprovalRequestDetailPageState
                                     section: request.cSectionName,
                                   ),
                                   const SizedBox(height: 10),
-                                  Text(
-                                    "Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}",
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: "Requested Amount",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              " : ${String.fromCharCode(8377)}${_money(requestedAmount)}",
+                                        ),
+                                      ],
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFF222222),
@@ -433,21 +509,27 @@ class _VoucherApprovalRequestDetailPageState
                                   const SizedBox(height: 6),
                                   _ApprovalTaxTable(taxes: taxes),
                                   const SizedBox(height: 8),
-                                  const Text(
-                                    "Comment",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    comment.isEmpty ? "-" : comment,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      height: 1.3,
-                                      color: Color(0xFF444444),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: "Comment ",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              comment.isEmpty ? "-" : comment,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            height: 1.3,
+                                            color: Color(0xFF444444),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 14),
@@ -540,8 +622,8 @@ class _VoucherApprovalRequestDetailPageState
                                         assetIcon: "assets/icons/cash.png",
                                         selected:
                                             _paymentMode == _VoucherPaymentMode.cash,
-                                        onTap: () => setState(
-                                          () => _paymentMode = _VoucherPaymentMode.cash,
+                                        onTap: () => _changePaymentMode(
+                                          _VoucherPaymentMode.cash,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -550,8 +632,8 @@ class _VoucherApprovalRequestDetailPageState
                                         assetIcon: "assets/icons/bank.png",
                                         selected:
                                             _paymentMode == _VoucherPaymentMode.bank,
-                                        onTap: () => setState(
-                                          () => _paymentMode = _VoucherPaymentMode.bank,
+                                        onTap: () => _changePaymentMode(
+                                          _VoucherPaymentMode.bank,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -560,8 +642,8 @@ class _VoucherApprovalRequestDetailPageState
                                         assetIcon: "assets/icons/cheque.png",
                                         selected:
                                             _paymentMode == _VoucherPaymentMode.cheque,
-                                        onTap: () => setState(
-                                          () => _paymentMode = _VoucherPaymentMode.cheque,
+                                        onTap: () => _changePaymentMode(
+                                          _VoucherPaymentMode.cheque,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -570,24 +652,42 @@ class _VoucherApprovalRequestDetailPageState
                                         assetIcon: "assets/icons/upi.png",
                                         selected:
                                             _paymentMode == _VoucherPaymentMode.upi,
-                                        onTap: () => setState(
-                                          () => _paymentMode = _VoucherPaymentMode.upi,
+                                        onTap: () => _changePaymentMode(
+                                          _VoucherPaymentMode.upi,
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
+                                  if (_paymentMode != _VoucherPaymentMode.cash) ...[
+                                    const Text(
+                                      "All fields shown below are mandatory for the selected payment mode.",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF6A6A6A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
                                   if (_paymentMode == _VoucherPaymentMode.bank) ...[
                                     _VoucherLabelText(label: "Bank Name"),
                                     const SizedBox(height: 6),
                                     _VoucherDropdownField(
                                       value: _selectedBankId,
+                                      hasError: _bankFieldError != null,
                                       hint: bankHint,
                                       items: bankItems,
                                       onChanged: (value) {
-                                        setState(() => _selectedBankId = value);
+                                        setState(() {
+                                          _selectedBankId = value;
+                                          _bankFieldError = null;
+                                        });
                                       },
                                     ),
+                                    if (_bankFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(text: _bankFieldError!),
+                                    ],
                                     if (bankError != null && bankItems.isEmpty) ...[
                                       const SizedBox(height: 6),
                                       Text(
@@ -606,27 +706,60 @@ class _VoucherApprovalRequestDetailPageState
                                     _VoucherTextField(
                                       controller: _chequeNumberController,
                                       hint: "",
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(6),
+                                      ],
+                                      hasError: _chequeNumberFieldError != null,
+                                      onChanged: (_) {
+                                        if (_chequeNumberFieldError == null) return;
+                                        setState(() {
+                                          _chequeNumberFieldError = null;
+                                        });
+                                      },
                                     ),
+                                    if (_chequeNumberFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(
+                                        text: _chequeNumberFieldError!,
+                                      ),
+                                    ],
                                     const SizedBox(height: 10),
                                     _VoucherLabelText(label: "Date"),
                                     const SizedBox(height: 6),
                                     _VoucherDateField(
+                                      hasError: _chequeDateFieldError != null,
                                       value: _chequeDate == null
                                           ? ""
                                           : _formatDate(_chequeDate!),
                                       onTap: _pickChequeDate,
                                     ),
+                                    if (_chequeDateFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(
+                                        text: _chequeDateFieldError!,
+                                      ),
+                                    ],
                                     const SizedBox(height: 10),
                                     _VoucherLabelText(label: "Bank Name"),
                                     const SizedBox(height: 6),
                                     _VoucherDropdownField(
                                       value: _selectedBankId,
+                                      hasError: _bankFieldError != null,
                                       hint: bankHint,
                                       items: bankItems,
                                       onChanged: (value) {
-                                        setState(() => _selectedBankId = value);
+                                        setState(() {
+                                          _selectedBankId = value;
+                                          _bankFieldError = null;
+                                        });
                                       },
                                     ),
+                                    if (_bankFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(text: _bankFieldError!),
+                                    ],
                                     if (bankError != null && bankItems.isEmpty) ...[
                                       const SizedBox(height: 6),
                                       Text(
@@ -645,14 +778,53 @@ class _VoucherApprovalRequestDetailPageState
                                     _VoucherTextField(
                                       controller: _transactionIdController,
                                       hint: "",
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.allow(
+                                          RegExp(r"[A-Za-z0-9]"),
+                                        ),
+                                        LengthLimitingTextInputFormatter(
+                                          _upiTransactionIdMaxLength,
+                                        ),
+                                      ],
+                                      hasError: _transactionIdFieldError != null,
+                                      onChanged: (_) {
+                                        if (_transactionIdFieldError == null) return;
+                                        setState(() {
+                                          _transactionIdFieldError = null;
+                                        });
+                                      },
                                     ),
+                                    if (_transactionIdFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(
+                                        text: _transactionIdFieldError!,
+                                      ),
+                                    ],
                                     const SizedBox(height: 10),
                                     _VoucherLabelText(label: "UPI APP"),
                                     const SizedBox(height: 6),
                                     _VoucherTextField(
                                       controller: _upiAppController,
                                       hint: "",
+                                      inputFormatters: [
+                                        LengthLimitingTextInputFormatter(
+                                          _upiAppMaxLength,
+                                        ),
+                                      ],
+                                      hasError: _upiAppFieldError != null,
+                                      onChanged: (_) {
+                                        if (_upiAppFieldError == null) return;
+                                        setState(() {
+                                          _upiAppFieldError = null;
+                                        });
+                                      },
                                     ),
+                                    if (_upiAppFieldError != null) ...[
+                                      const SizedBox(height: 6),
+                                      _VoucherInlineErrorText(
+                                        text: _upiAppFieldError!,
+                                      ),
+                                    ],
                                     const SizedBox(height: 14),
                                   ],
                                     Align(
@@ -791,11 +963,39 @@ class _VoucherLabelText extends StatelessWidget {
   }
 }
 
+class _VoucherInlineErrorText extends StatelessWidget {
+  final String text;
+
+  const _VoucherInlineErrorText({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        color: Color(0xFFCC2B2B),
+      ),
+    );
+  }
+}
+
 class _VoucherTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
+  final ValueChanged<String>? onChanged;
+  final bool hasError;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
 
-  const _VoucherTextField({required this.controller, required this.hint});
+  const _VoucherTextField({
+    required this.controller,
+    required this.hint,
+    this.onChanged,
+    this.hasError = false,
+    this.keyboardType,
+    this.inputFormatters,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -804,11 +1004,16 @@ class _VoucherTextField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFCCDDEB)),
+        border: Border.all(
+          color: hasError ? const Color(0xFFCC2B2B) : const Color(0xFFCCDDEB),
+        ),
         borderRadius: BorderRadius.circular(6),
       ),
       child: TextField(
         controller: controller,
+        onChanged: onChanged,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           hintText: hint,
@@ -828,12 +1033,14 @@ class _VoucherDropdownField extends StatelessWidget {
   final String hint;
   final List<BedtimeGetBankList> items;
   final ValueChanged<int?> onChanged;
+  final bool hasError;
 
   const _VoucherDropdownField({
     required this.value,
     required this.hint,
     required this.items,
     required this.onChanged,
+    this.hasError = false,
   });
 
   @override
@@ -843,7 +1050,9 @@ class _VoucherDropdownField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFCCDDEB)),
+        border: Border.all(
+          color: hasError ? const Color(0xFFCC2B2B) : const Color(0xFFCCDDEB),
+        ),
         borderRadius: BorderRadius.circular(6),
       ),
       child: DropdownButtonHideUnderline(
@@ -876,8 +1085,13 @@ class _VoucherDropdownField extends StatelessWidget {
 class _VoucherDateField extends StatelessWidget {
   final String value;
   final VoidCallback onTap;
+  final bool hasError;
 
-  const _VoucherDateField({required this.value, required this.onTap});
+  const _VoucherDateField({
+    required this.value,
+    required this.onTap,
+    this.hasError = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -888,7 +1102,9 @@ class _VoucherDateField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: const Color(0xFFCCDDEB)),
+          border: Border.all(
+            color: hasError ? const Color(0xFFCC2B2B) : const Color(0xFFCCDDEB),
+          ),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(

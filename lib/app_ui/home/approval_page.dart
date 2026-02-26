@@ -9,6 +9,7 @@ class ApprovalPage extends StatefulWidget {
 
 class _ApprovalPageState extends State<ApprovalPage> {
   final TextEditingController _searchController = TextEditingController();
+  late final BedtimePaymentRequestBloc _approvalBloc;
   int _projectId = 0;
   int _userActionId = 0;
   String _statusFilter = "";
@@ -18,13 +19,27 @@ class _ApprovalPageState extends State<ApprovalPage> {
   @override
   void initState() {
     super.initState();
+    _approvalBloc = BedtimePaymentRequestBloc(
+      context.read<BedtimePaymentRequestBloc>().repository,
+    );
+    BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
+      _handleSelectedProjectChanged,
+    );
     _loadApprovals();
   }
 
   @override
   void dispose() {
+    BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
+      _handleSelectedProjectChanged,
+    );
+    _approvalBloc.close();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSelectedProjectChanged() {
+    unawaited(_loadApprovals());
   }
 
   Future<void> _loadApprovals() async {
@@ -38,7 +53,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
 
     if (!mounted) return;
 
-    context.read<BedtimePaymentRequestBloc>().add(
+    _approvalBloc.add(
       BedtimePaymentRequestLoadRequested(
         companyId: 1,
         projectId: projectId,
@@ -77,7 +92,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
             ? userIdValue
             : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
         _userActionId = resolvedUserId;
-        context.read<BedtimePaymentRequestBloc>().add(
+        _approvalBloc.add(
           BedtimePaymentRequestSearchRequested(
             companyId: 1,
             projectId: _projectId,
@@ -92,7 +107,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
       return;
     }
 
-    context.read<BedtimePaymentRequestBloc>().add(
+    _approvalBloc.add(
       BedtimePaymentRequestSearchRequested(
         companyId: 1,
         projectId: _projectId,
@@ -257,6 +272,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
                     BedtimePaymentRequestBloc,
                     BedtimePaymentRequestState
                   >(
+                    bloc: _approvalBloc,
                     builder: (context, state) {
                       if (state is BedtimePaymentRequestLoading) {
                         return const Center(child: CircularProgressIndicator());
@@ -366,10 +382,10 @@ class _ApprovalFilterBottomSheetState
   }
 
   String _formatDate(DateTime date) {
-    final y = date.year.toString().padLeft(4, "0");
+    final y = (date.year % 100).toString().padLeft(2, "0");
     final m = date.month.toString().padLeft(2, "0");
     final d = date.day.toString().padLeft(2, "0");
-    return "$y-$m-$d";
+    return "$d/$m/$y";
   }
 
   void _onCalendarDateChanged(DateTime date) {

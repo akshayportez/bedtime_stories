@@ -154,8 +154,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
+      _handleSelectedProjectChanged,
+    );
     _loadApprovalPendingCount();
     _loadVoucherPendingCount();
+  }
+
+  @override
+  void dispose() {
+    BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
+      _handleSelectedProjectChanged,
+    );
+    super.dispose();
+  }
+
+  void _handleSelectedProjectChanged() {
+    unawaited(_loadApprovalPendingCount());
+    unawaited(_loadVoucherPendingCount());
   }
 
   @override

@@ -28,6 +28,9 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     _voucherBloc = BedtimePaymentVoucherBloc(
       context.read<BedtimePaymentVoucherBloc>().repository,
     );
+    BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
+      _handleSelectedProjectChanged,
+    );
     _loadVouchers();
   }
 
@@ -52,9 +55,16 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     if (_isRouteObserverSubscribed) {
       routeObserver.unsubscribe(this);
     }
+    BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
+      _handleSelectedProjectChanged,
+    );
     _voucherBloc.close();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSelectedProjectChanged() {
+    unawaited(_loadVouchers());
   }
 
   Future<void> _loadVouchers() async {
@@ -99,40 +109,8 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   }
 
   void _onSearchChanged(String value) {
-    if (_userActionId == 0) {
-      BedtimeLocalStorage.getUserData().then((userData) {
-        if (!mounted) return;
-        final userIdValue = userData["userId"];
-        final resolvedUserId = userIdValue is int
-            ? userIdValue
-            : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
-        _userActionId = resolvedUserId;
-        _voucherBloc.add(
-          BedtimePaymentVoucherSearchRequested(
-            companyId: 1,
-            projectId: _projectId,
-            userActionId: _userActionId,
-            search: value.trim(),
-            statusFilter: _payModeFilter,
-            dFrom: _dFrom,
-            dTo: _dTo,
-          ),
-        );
-      });
-      return;
-    }
-
-    _voucherBloc.add(
-      BedtimePaymentVoucherSearchRequested(
-        companyId: 1,
-        projectId: _projectId,
-        userActionId: _userActionId,
-        search: value.trim(),
-        statusFilter: _payModeFilter,
-        dFrom: _dFrom,
-        dTo: _dTo,
-      ),
-    );
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _reloadAfterVoucherChange() async {
@@ -166,12 +144,25 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     return "$y-$m-$d";
   }
 
+  String _formatFilterDisplayDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, "0");
+    final m = date.month.toString().padLeft(2, "0");
+    final y = (date.year % 100).toString().padLeft(2, "0");
+    return "$d/$m/$y";
+  }
+
+  String _formatStoredFilterDateForDisplay(String value) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    return _formatFilterDisplayDate(parsed);
+  }
+
   String _selectedDateRangeText() {
     if (_dFrom.isEmpty && _dTo.isEmpty) return "";
     if (_dFrom.isNotEmpty && _dTo.isNotEmpty) {
-      return "Date: $_dFrom - $_dTo";
+      return "Date: ${_formatStoredFilterDateForDisplay(_dFrom)} - ${_formatStoredFilterDateForDisplay(_dTo)}";
     }
-    return "Date: ${_dFrom.isNotEmpty ? _dFrom : _dTo}";
+    return "Date: ${_dFrom.isNotEmpty ? _formatStoredFilterDateForDisplay(_dFrom) : _formatStoredFilterDateForDisplay(_dTo)}";
   }
 
   Future<void> _openFilterSheet() async {
@@ -204,6 +195,20 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   bool _isPaid(String status) => status.trim().toLowerCase() == "paid";
 
   String _formatAmount(double amount) => amount.toStringAsFixed(2);
+
+  bool _matchesVoucherSearch(BedtimePaymentVoucher voucher, String rawQuery) {
+    final query = rawQuery.trim().toLowerCase().replaceAll(" ", "");
+    if (query.isEmpty) return true;
+
+    final displayedVoucherNo = (voucher.cVoucherNo.isEmpty
+            ? voucher.cRequestNo
+            : voucher.cVoucherNo)
+        .trim()
+        .toLowerCase()
+        .replaceAll(" ", "");
+
+    return displayedVoucherNo.contains(query);
+  }
 
   BedtimePaymentRequest _toPaymentRequest(BedtimePaymentVoucher voucher) {
     return BedtimePaymentRequest(
@@ -317,8 +322,14 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
                   }
 
                   if (state is BedtimePaymentVoucherLoaded) {
-                    final vouchers =
-                        state.vouchers.where((v) => _isPaid(v.cStatus)).toList();
+                    final searchQuery = _searchController.text.trim();
+                    final vouchers = state.vouchers
+                        .where(
+                          (v) =>
+                              _isPaid(v.cStatus) &&
+                              _matchesVoucherSearch(v, searchQuery),
+                        )
+                        .toList();
                     if (vouchers.isEmpty) {
                       return const Center(child: Text("No vouchers found"));
                     }
@@ -615,10 +626,10 @@ class _VoucherFilterBottomSheetState extends State<_VoucherFilterBottomSheet> {
   }
 
   String _formatDate(DateTime date) {
-    final y = date.year.toString().padLeft(4, "0");
-    final m = date.month.toString().padLeft(2, "0");
     final d = date.day.toString().padLeft(2, "0");
-    return "$y-$m-$d";
+    final m = date.month.toString().padLeft(2, "0");
+    final y = (date.year % 100).toString().padLeft(2, "0");
+    return "$d/$m/$y";
   }
 
   void _onCalendarDateChanged(DateTime date) {

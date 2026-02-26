@@ -13,6 +13,9 @@ import 'package:bedtime_stories/app_ui/home/bloc/get_category_list_bloc/bedtime_
 import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_section_list_bloc/bedtime_get_section_list_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_users_list_bloc/bedtime_get_users_list_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_users_list_bloc/bedtime_get_users_list_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/get_users_list_bloc/bedtime_get_users_list_repository.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_tax_list_bloc/bedtime_get_tax_list_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_tax_list_bloc/bedtime_get_tax_list_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/get_tax_list_bloc/bedtime_get_tax_list_repository.dart';
@@ -37,6 +40,9 @@ import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_save_bloc/bedti
 import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_detail_bloc/bedtime_payment_voucher_detail_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_detail_bloc/bedtime_payment_voucher_detail_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_detail_bloc/bedtime_payment_voucher_detail_repository.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_pdf_bloc/bedtime_payment_voucher_pdf_api_provider.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_pdf_bloc/bedtime_payment_voucher_pdf_bloc.dart';
+import 'package:bedtime_stories/app_ui/home/bloc/payment_voucher_pdf_bloc/bedtime_payment_voucher_pdf_repository.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_api_provider.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_bloc.dart';
 import 'package:bedtime_stories/app_ui/home/bloc/payment_request_detail_bloc/bedtime_payment_request_detail_repository.dart';
@@ -112,6 +118,13 @@ Future<void> main() async {
       ),
     ),
     BlocProvider(
+      create: (_) => BedtimeGetUsersListBloc(
+        BedtimeGetUsersListRepository(
+          BedtimeGetUsersListApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
       create: (_) => BedtimeGetTaxListBloc(
         BedtimeGetTaxListRepository(
           BedtimeGetTaxListApiProvider(),
@@ -157,6 +170,13 @@ Future<void> main() async {
       create: (_) => BedtimePaymentVoucherDetailBloc(
         BedtimePaymentVoucherDetailRepository(
           BedtimePaymentVoucherDetailApiProvider(),
+        ),
+      ),
+    ),
+    BlocProvider(
+      create: (_) => BedtimePaymentVoucherPdfBloc(
+        BedtimePaymentVoucherPdfRepository(
+          BedtimePaymentVoucherPdfApiProvider(),
         ),
       ),
     ),

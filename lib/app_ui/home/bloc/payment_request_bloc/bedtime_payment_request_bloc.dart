@@ -48,7 +48,7 @@ class BedtimePaymentRequestBloc
       final requests = await repository.getPaymentRequests(
         companyId: event.companyId,
         projectId: event.projectId,
-        userActionId: event.userActionId,
+        userActionId: 0,
         search: event.search,
         statusFilter: event.statusFilter,
         dFrom: event.dFrom,

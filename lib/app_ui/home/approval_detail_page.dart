@@ -429,23 +429,30 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                                   ),
                                   const SizedBox(height: 6),
                                   _ApprovalTaxTable(taxes: taxes),
-                                     const SizedBox(height: 8),
-                                  const Text(
-                                    'Comments',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    comment.isEmpty ? '-' : comment,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      height: 1.3,
-                                      color: Color(0xFF444444),
-                                    ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Comment :',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          comment.isEmpty ? '-' : comment,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            height: 1.3,
+                                            color: Color(0xFF444444),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 14),
                                   const Text(

@@ -10,10 +10,6 @@ class VoucherViewPage extends StatefulWidget {
 }
 
 class _VoucherViewPageState extends State<VoucherViewPage> {
-  // Temporary sample file until API PDF URL is wired.
-  static const String _sampleVoucherPdfUrl =
-      'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-
   bool _showPaidDetails = false;
   bool _isDeleting = false;
   bool _isSuccessDialogVisible = false;
@@ -24,6 +20,11 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   int _resolveInt(dynamic value, {int fallback = 0}) {
     if (value is int) return value;
     return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
+  Future<int> _getStoredUserActionId() async {
+    final userData = await BedtimeLocalStorage.getUserData();
+    return _resolveInt(userData["userId"]);
   }
 
   @override
@@ -289,35 +290,96 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
 
     if (didUpdate == true && mounted) {
       _loadVoucherDetail();
-    }
-  }
-
-  Future<void> _openVoucherPdf({String? pdfUrl}) async {
-    final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
-
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _VoucherPdfViewerPage(
-          title: 'Voucher PDF',
-          pdfUrl: resolvedPdfUrl,
+      final userActionId = await _getStoredUserActionId();
+      context.read<BedtimePaymentVoucherPdfBloc>().add(
+        BedtimePaymentVoucherPdfLoadRequested(
+          companyId: 1,
+          payReqId: widget.request.nPayReqId,
+          userActionId: userActionId,
         ),
-      ),
-    );
+      );
+    }
   }
 
-  String _resolvedPdfUrl(String? pdfUrl) {
-    final incomingPdfUrl = (pdfUrl ?? '').trim();
-    return incomingPdfUrl.isEmpty ? _sampleVoucherPdfUrl : incomingPdfUrl;
-  }
+  Future<BedtimePaymentVoucherPdfLoaded> _ensureVoucherPdfLoaded() async {
+    final bloc = context.read<BedtimePaymentVoucherPdfBloc>();
+    final payReqId = widget.request.nPayReqId;
+    final currentState = bloc.state;
 
-  String _buildPdfFileName(String pdfUrl) {
-    final uri = Uri.tryParse(pdfUrl);
-    var candidateName = '';
-    if (uri != null && uri.pathSegments.isNotEmpty) {
-      candidateName = uri.pathSegments.last.trim();
+    if (currentState is BedtimePaymentVoucherPdfLoaded &&
+        currentState.payReqId == payReqId) {
+      return currentState;
     }
 
+    final isAlreadyLoading =
+        currentState is BedtimePaymentVoucherPdfLoading &&
+        currentState.payReqId == payReqId;
+
+    if (!isAlreadyLoading) {
+      final userActionId = await _getStoredUserActionId();
+      bloc.add(
+        BedtimePaymentVoucherPdfLoadRequested(
+          companyId: 1,
+          payReqId: payReqId,
+          userActionId: userActionId,
+        ),
+      );
+    }
+
+    final state = await bloc.stream.firstWhere((state) {
+      if (state is BedtimePaymentVoucherPdfLoaded) {
+        return state.payReqId == payReqId;
+      }
+      if (state is BedtimePaymentVoucherPdfFailure) {
+        return state.payReqId == payReqId;
+      }
+      return false;
+    });
+
+    if (state is BedtimePaymentVoucherPdfLoaded) {
+      return state;
+    }
+    if (state is BedtimePaymentVoucherPdfFailure) {
+      throw Exception(state.message);
+    }
+    throw Exception('Unable to load voucher PDF');
+  }
+
+  Future<void> _openVoucherPdf() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Preparing PDF...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      final pdfState = await _ensureVoucherPdfLoaded();
+      if (!mounted) return;
+
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _VoucherPdfViewerPage(
+            title: 'Voucher PDF',
+            pdfBytes: pdfState.pdfBytes,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unable to open PDF: $e')),
+      );
+    }
+  }
+
+  String _buildPdfFileName([String? suggestedName]) {
+    var candidateName = (suggestedName ?? '').trim();
+    candidateName = candidateName.split('/').last.split('\\').last;
     candidateName = candidateName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -337,34 +399,8 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     return '${baseName}_$now.pdf';
   }
 
-  Future<Uint8List> _downloadPdfBytes(String pdfUrl) async {
-    final uri = Uri.tryParse(pdfUrl);
-    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
-      throw Exception('Invalid PDF URL');
-    }
-
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode < HttpStatus.ok ||
-          response.statusCode >= HttpStatus.multipleChoices) {
-        throw Exception('Failed to download PDF (HTTP ${response.statusCode})');
-      }
-
-      final bytesBuilder = BytesBuilder(copy: false);
-      await for (final chunk in response) {
-        bytesBuilder.add(chunk);
-      }
-      return bytesBuilder.takeBytes();
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  Future<File> _downloadPdfToTempFile(String pdfUrl) async {
-    final pdfBytes = await _downloadPdfBytes(pdfUrl);
-    final fileName = _buildPdfFileName(pdfUrl);
+  Future<File> _downloadPdfToTempFile(Uint8List pdfBytes) async {
+    final fileName = _buildPdfFileName();
     final filePath =
         '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
     final file = File(filePath);
@@ -372,7 +408,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     return file;
   }
 
-  Future<void> _shareVoucherPdf({String? pdfUrl}) async {
+  Future<void> _shareVoucherPdf() async {
     if (_isSharingPdf) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -387,8 +423,8 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
         ),
       );
 
-      final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
-      final pdfFile = await _downloadPdfToTempFile(resolvedPdfUrl);
+      final pdfState = await _ensureVoucherPdfLoaded();
+      final pdfFile = await _downloadPdfToTempFile(pdfState.pdfBytes);
 
       if (!mounted) return;
       await SharePlus.instance.share(
@@ -413,7 +449,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
     }
   }
 
-  Future<void> _printVoucherPdf({String? pdfUrl}) async {
+  Future<void> _printVoucherPdf() async {
     if (_isPrintingPdf) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -428,13 +464,12 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
         ),
       );
 
-      final resolvedPdfUrl = _resolvedPdfUrl(pdfUrl);
-      final pdfBytes = await _downloadPdfBytes(resolvedPdfUrl);
+      final pdfState = await _ensureVoucherPdfLoaded();
       if (!mounted) return;
 
       await Printing.layoutPdf(
-        name: _buildPdfFileName(resolvedPdfUrl),
-        onLayout: (_) async => pdfBytes,
+        name: _buildPdfFileName(),
+        onLayout: (_) async => pdfState.pdfBytes,
       );
     } catch (e) {
       if (!mounted) return;
@@ -491,7 +526,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   RichText(
                     text: TextSpan(
                       style: const TextStyle(fontSize: 12, color: Colors.black),
@@ -508,7 +543,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   Text(
                     'Req No : ${request.cRequestNo}',
                     style: const TextStyle(
@@ -648,21 +683,26 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                               const SizedBox(height: 6),
                               _ApprovalTaxTable(taxes: taxes),
                               const SizedBox(height: 8),
-                              const Text(
-                                'Comments',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                comment.isEmpty ? '-' : comment,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.3,
-                                  color: Color(0xFF444444),
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Comments ',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: comment.isEmpty ? '-' : comment,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        height: 1.3,
+                                        color: Color(0xFF444444),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -952,9 +992,9 @@ class _VoucherActionIcon extends StatelessWidget {
 
 class _VoucherPdfViewerPage extends StatelessWidget {
   final String title;
-  final String pdfUrl;
+  final Uint8List pdfBytes;
 
-  const _VoucherPdfViewerPage({required this.title, required this.pdfUrl});
+  const _VoucherPdfViewerPage({required this.title, required this.pdfBytes});
 
   @override
   Widget build(BuildContext context) {
@@ -967,8 +1007,8 @@ class _VoucherPdfViewerPage extends StatelessWidget {
           icon: const Icon(Icons.close),
         ),
       ),
-      body: SfPdfViewer.network(
-        pdfUrl,
+      body: SfPdfViewer.memory(
+        pdfBytes,
         onDocumentLoadFailed: (details) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Unable to load PDF: ${details.error}')),
