@@ -12,7 +12,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   late final BedtimePaymentVoucherBloc _voucherBloc;
   bool _isRouteObserverSubscribed = false;
   int _projectId = 0;
-  int _userActionId = 0;
+  int? _userActionId;
   String _payModeFilter = "";
   String _dFrom = "";
   String _dTo = "";
@@ -20,6 +20,14 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   int _resolveInt(dynamic value, {int fallback = 0}) {
     if (value is int) return value;
     return int.tryParse(value?.toString() ?? "") ?? fallback;
+  }
+
+  Future<int?> _getStoredUserId() async {
+    final userData = await BedtimeLocalStorage.getUserData();
+    final userIdValue =
+        userData["userId"] ?? userData["nUserId"] ?? userData["userID"];
+    final resolved = _resolveInt(userIdValue);
+    return resolved > 0 ? resolved : null;
   }
 
   @override
@@ -69,20 +77,18 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
 
   Future<void> _loadVouchers() async {
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue = userData["userId"];
+    final userActionId = await _getStoredUserId();
     _projectId = projectId;
-    _userActionId = userIdValue is int
-        ? userIdValue
-        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+    _userActionId = userActionId;
 
     if (!mounted) return;
+    if (userActionId == null) return;
 
     _voucherBloc.add(
       BedtimePaymentVoucherLoadRequested(
         companyId: 1,
         projectId: projectId,
-        userActionId: _userActionId,
+        userActionId: userActionId,
         search: "",
         statusFilter: _payModeFilter,
         dFrom: _dFrom,
@@ -119,9 +125,8 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     final projectId = _projectId > 0
         ? _projectId
         : await BedtimeLocalStorage.getSelectedProjectId();
-    final userActionId = _userActionId > 0
-        ? _userActionId
-        : _resolveInt((await BedtimeLocalStorage.getUserData())["userId"]);
+    final userActionId = _userActionId ?? await _getStoredUserId();
+    if (userActionId == null) return;
 
     if (!mounted) return;
     context.read<BedtimePaymentRequestBloc>().add(

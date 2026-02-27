@@ -408,28 +408,27 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 8),
-                                  if (!(_isApproved || _isRejected || _isPaid))
-                                    Row(
-                                      children: [
-                                        Text(
-                                          "Req No : ${request.cRequestNo}",
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                            color: Color(0xFF333333),
-                                          ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        "Req No : ${request.cRequestNo}",
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Color(0xFF333333),
                                         ),
-                                        const Spacer(),
-                                        Text(
-                                          request.cRequestDateTime ?? "",
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF242424),
-                                          ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        request.cRequestDateTime ?? "",
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF242424),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
+                                  ),
                                   const SizedBox(height: 14),
                                   _DetailField(
                                     label: "Account",
@@ -1379,21 +1378,50 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = isBold ? 16.0 : 12.0;
+    final fontWeight = isBold ? FontWeight.w600 : FontWeight.w500;
+    final splitIndex = label.indexOf(' (');
+    final hasColoredSuffix =
+        labelColor != null && splitIndex > 0 && label.endsWith(')');
+
     return Row(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isBold ? 16 : 12,
-            fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
-            color: labelColor ?? Colors.black,
-          ),
-        ),
+        hasColoredSuffix
+            ? Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: label.substring(0, splitIndex),
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: fontWeight,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(
+                      text: label.substring(splitIndex),
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: fontWeight,
+                        color: labelColor,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Text(
+                label,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                  color: labelColor ?? Colors.black,
+                ),
+              ),
         const Spacer(),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 16 : 12,
+            fontSize: fontSize,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),

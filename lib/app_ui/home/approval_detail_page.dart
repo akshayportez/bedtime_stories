@@ -586,9 +586,29 @@ class _ApprovalInfoRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            '$title : $value',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF3A3A3A)),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$title : ',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF232323),
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF6A6A6A),
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -615,8 +635,8 @@ class _ApprovalTaxTable extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: isHeader ? 13 : 14,
-          fontWeight: isHeader ? FontWeight.w500 : FontWeight.w400,
-          color: Colors.black,
+          fontWeight: isHeader ? FontWeight.w600 : FontWeight.w400,
+          color: isHeader ? const Color(0xFF1E1E1E) : const Color(0xFF666666),
         ),
       ),
     );

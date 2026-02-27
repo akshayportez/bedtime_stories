@@ -1,5 +1,55 @@
 part of 'package:bedtime_stories/utils/lib_files.dart';
 
+double _clampPercentageValue(double value) {
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+String _clampPercentageText(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return "";
+
+  final parsed = double.tryParse(trimmed);
+  if (parsed == null) return trimmed;
+
+  final clamped = _clampPercentageValue(parsed);
+  if (clamped == clamped.truncateToDouble()) {
+    return clamped.toStringAsFixed(0);
+  }
+
+  return clamped
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
+}
+
+TextInputFormatter _percentageLimit100InputFormatter() {
+  return TextInputFormatter.withFunction((oldValue, newValue) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    if (!RegExp(r'^\d*\.?\d*$').hasMatch(text)) {
+      return oldValue;
+    }
+
+    final parsed = double.tryParse(text);
+    if (parsed == null) {
+      return oldValue;
+    }
+
+    if (parsed <= 100) {
+      return newValue;
+    }
+
+    const clampedText = "100";
+    return const TextEditingValue(
+      text: clampedText,
+      selection: TextSelection.collapsed(offset: 3),
+    );
+  });
+}
+
 class CreateRequestPage extends StatefulWidget {
   final bool isEditMode;
   final BedtimePaymentRequest? initialRequest;
@@ -60,7 +110,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   String get _defaultTaxName => taxOptions.isNotEmpty ? taxOptions.first : "";
 
-  String _defaultTaxRate() => taxRates[_defaultTaxName] ?? "";
+  String _defaultTaxRate() =>
+      _clampPercentageText(taxRates[_defaultTaxName] ?? "");
 
   List<String> _availableTaxOptionsForRow(int index) {
     final currentTaxName = index >= 0 && index < taxList.length
@@ -98,8 +149,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   void _onTaxNameChanged(int index, String? selectedTax) {
     if (selectedTax == null) return;
     setState(() {
+      final rate = _clampPercentageText(taxRates[selectedTax] ?? "");
       taxList[index]["name"] = selectedTax;
-      taxList[index]["rate"] = taxRates[selectedTax] ?? "";
+      taxList[index]["rate"] = rate;
       _taxRateControllers[index].text = taxList[index]["rate"] ?? "";
       if (_taxInlineError != null && _hasValidTaxSelection()) {
         _taxInlineError = null;
@@ -108,8 +160,15 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   void _onTaxRateChanged(int index, String value) {
+    final normalizedValue = _clampPercentageText(value);
     setState(() {
-      taxList[index]["rate"] = value;
+      taxList[index]["rate"] = normalizedValue;
+      if (normalizedValue != value) {
+        _taxRateControllers[index].value = TextEditingValue(
+          text: normalizedValue,
+          selection: TextSelection.collapsed(offset: normalizedValue.length),
+        );
+      }
       if (_taxInlineError != null && _hasValidTaxSelection()) {
         _taxInlineError = null;
       }
@@ -147,13 +206,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         return;
       }
 
-      taxList.add({
-        "name": nextAvailableTax,
-        "rate": taxRates[nextAvailableTax] ?? "",
-      });
-      _taxRateControllers.add(
-        TextEditingController(text: taxRates[nextAvailableTax] ?? ""),
-      );
+      final nextRate = _clampPercentageText(taxRates[nextAvailableTax] ?? "");
+      taxList.add({"name": nextAvailableTax, "rate": nextRate});
+      _taxRateControllers.add(TextEditingController(text: nextRate));
     });
   }
 
@@ -176,9 +231,13 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         .replaceFirst(RegExp(r'\.$'), '');
   }
 
+  String _formatPercentageRate(double rate) {
+    return _formatRate(_clampPercentageValue(rate));
+  }
+
   void _applyAccountTaxAndTds(BedtimeGetAccountsList account) {
     isTdsChecked = account.bTDS;
-    _tdsRateController.text = _formatRate(account.nTDSPercent);
+    _tdsRateController.text = _formatPercentageRate(account.nTDSPercent);
     _tdsInlineError = null;
     _taxInlineError = null;
     taxRates.clear();
@@ -192,7 +251,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       _taxRateControllers.clear();
       taxList = account.taxDetails
           .map(
-            (tax) => {"name": tax.cTaxName, "rate": _formatRate(tax.nTaxRate)},
+            (tax) => {
+              "name": tax.cTaxName,
+              "rate": _formatPercentageRate(tax.nTaxRate),
+            },
           )
           .toList();
       for (int i = 0; i < taxList.length; i++) {
@@ -229,11 +291,15 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     return double.tryParse(sanitized) ?? 0;
   }
 
+  double _parsePercentage(String value) {
+    return _clampPercentageValue(_parseNumber(value));
+  }
+
   String _formatCurrency(double value) => "₹${value.toStringAsFixed(2)}";
 
   double get _requestedAmount => _parseNumber(_requestedAmountController.text);
 
-  double get _tdsRate => _parseNumber(_tdsRateController.text);
+  double get _tdsRate => _parsePercentage(_tdsRateController.text);
 
   double get _tdsAmount {
     if (!isTdsChecked) return 0;
@@ -243,7 +309,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   double get _totalTaxAmount {
     if (!isTaxableChecked) return 0;
     return taxList.fold<double>(0, (sum, tax) {
-      final rate = _parseNumber(tax["rate"] ?? "");
+      final rate = _parsePercentage(tax["rate"] ?? "");
       return sum + (_requestedAmount * rate / 100);
     });
   }
@@ -261,7 +327,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     for (final tax in taxList) {
       final taxName = (tax["name"] ?? "").trim();
       final taxId = _taxIdByName[taxName] ?? 0;
-      final taxRate = _parseNumber(tax["rate"] ?? "");
+      final taxRate = _parsePercentage(tax["rate"] ?? "");
       if (taxId > 0 && taxRate > 0) return true;
     }
     return false;
@@ -346,7 +412,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         : "";
 
     isTdsChecked = detail?.bTDS ?? false;
-    _tdsRateController.text = _formatRate(detail?.nTDSPercent ?? 0);
+    _tdsRateController.text = _formatPercentageRate(detail?.nTDSPercent ?? 0);
     isTaxableChecked = detail?.bTaxable ?? false;
     _commentController.text = detail?.cComment ?? "";
 
@@ -359,7 +425,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     if (isTaxableChecked && widget.initialTaxes.isNotEmpty) {
       for (final tax in widget.initialTaxes) {
         final taxName = tax.cTaxName.trim();
-        final taxRate = _formatRate(tax.nTaxRate);
+        final taxRate = _formatPercentageRate(tax.nTaxRate);
         if (taxName.isNotEmpty && !taxOptions.contains(taxName)) {
           taxOptions.add(taxName);
         }
@@ -745,6 +811,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                                             const TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
+                                        inputFormatters: [
+                                          _percentageLimit100InputFormatter(),
+                                        ],
                                         textAlign: TextAlign.left,
                                         style: const TextStyle(fontSize: 13),
                                         decoration: const InputDecoration(
@@ -805,14 +874,15 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                     }
                     if (isTaxableChecked && taxList.isEmpty) {
                       final defaultTax = _defaultTaxName;
+                      final defaultRate = _defaultTaxRate();
                       taxList = [
                         {
                           "name": defaultTax,
-                          "rate": taxRates[defaultTax] ?? "",
+                          "rate": defaultRate,
                         },
                       ];
                       _taxRateControllers.add(
-                        TextEditingController(text: taxRates[defaultTax] ?? ""),
+                        TextEditingController(text: defaultRate),
                       );
                     }
                   });
@@ -966,6 +1036,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                                                     const TextInputType.numberWithOptions(
                                                       decimal: true,
                                                     ),
+                                                inputFormatters: [
+                                                  _percentageLimit100InputFormatter(),
+                                                ],
                                                 onChanged: (value) =>
                                                     _onTaxRateChanged(
                                                       index,
@@ -1602,7 +1675,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         .map((tax) {
           final taxName = (tax["name"] ?? "").trim();
           final taxId = _taxIdByName[taxName] ?? 0;
-          final taxRate = _parseNumber(tax["rate"] ?? "");
+          final taxRate = _parsePercentage(tax["rate"] ?? "");
           return {"nTaxId": taxId, "nTaxRate": taxRate};
         })
         .where((tax) {
@@ -2594,7 +2667,8 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   String get _defaultTaxName =>
       widget.taxOptions.isNotEmpty ? widget.taxOptions.first : "";
 
-  String _defaultTaxRate() => widget.taxRates[_defaultTaxName] ?? "";
+  String _defaultTaxRate() =>
+      _clampPercentageText(widget.taxRates[_defaultTaxName] ?? "");
 
   @override
   void initState() {
@@ -2621,27 +2695,36 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   void _onTaxNameChanged(int index, String? selectedTax) {
     if (selectedTax == null) return;
     setState(() {
+      final rate = _clampPercentageText(widget.taxRates[selectedTax] ?? "");
       _taxList[index]["name"] = selectedTax;
-      _taxList[index]["rate"] = widget.taxRates[selectedTax] ?? "";
+      _taxList[index]["rate"] = rate;
       _taxRateControllers[index].text = _taxList[index]["rate"] ?? "";
     });
   }
 
   void _onTaxRateChanged(int index, String value) {
+    final normalizedValue = _clampPercentageText(value);
     setState(() {
-      _taxList[index]["rate"] = value;
+      _taxList[index]["rate"] = normalizedValue;
+      if (normalizedValue != value) {
+        _taxRateControllers[index].value = TextEditingValue(
+          text: normalizedValue,
+          selection: TextSelection.collapsed(offset: normalizedValue.length),
+        );
+      }
     });
   }
 
   void _addTaxRow() {
     setState(() {
       final defaultTax = _defaultTaxName;
+      final defaultRate = _defaultTaxRate();
       _taxList.add({
         "name": defaultTax,
-        "rate": widget.taxRates[defaultTax] ?? "",
+        "rate": defaultRate,
       });
       _taxRateControllers.add(
-        TextEditingController(text: widget.taxRates[defaultTax] ?? ""),
+        TextEditingController(text: defaultRate),
       );
     });
   }
@@ -2659,6 +2742,10 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
     return double.tryParse(sanitized) ?? 0;
   }
 
+  double _parsePercentage(String value) {
+    return _clampPercentageValue(_parseNumber(value));
+  }
+
   int _resolveInt(dynamic value, {int fallback = 0}) {
     if (value is int) return value;
     return int.tryParse(value?.toString() ?? "") ?? fallback;
@@ -2671,7 +2758,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
         .map((tax) {
           final taxName = (tax["name"] ?? "").trim();
           final taxId = widget.taxIdByName[taxName] ?? 0;
-          final taxRate = _parseNumber(tax["rate"] ?? "");
+          final taxRate = _parsePercentage(tax["rate"] ?? "");
           return {"nTaxId": taxId, "cTaxName": taxName, "nTaxRate": taxRate};
         })
         .where((tax) => (tax["nTaxId"] as int) > 0)
@@ -2713,7 +2800,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
           "cGST": _gstController.text.trim(),
           "bTDS": _isTdsChecked,
           "nTDSPercent": _isTdsChecked
-              ? _parseNumber(_tdsRateController.text)
+              ? _parsePercentage(_tdsRateController.text)
               : 0,
           "bTaxable": _isTaxableChecked,
           "nProjectId": selectedProjectId,
@@ -2744,6 +2831,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
     String hint = "",
     String? suffixText,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
     double fontSize = 13,
     double hintFontSize = 13,
     double suffixFontSize = 15,
@@ -2763,6 +2851,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
               controller: controller,
               enabled: enabled,
               keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
               textAlign: TextAlign.start,
               textAlignVertical: TextAlignVertical.center,
               minLines: null,
@@ -2923,6 +3012,9 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
+                          inputFormatters: [
+                            _percentageLimit100InputFormatter(),
+                          ],
                           fontSize: 15,
                           hintFontSize: 14,
                           suffixFontSize: 15,
@@ -2936,15 +3028,16 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                           _isTaxableChecked = !_isTaxableChecked;
                           if (_isTaxableChecked && _taxList.isEmpty) {
                             final defaultTax = _defaultTaxName;
+                            final defaultRate = _defaultTaxRate();
                             _taxList = [
                               {
                                 "name": defaultTax,
-                                "rate": widget.taxRates[defaultTax] ?? "",
+                                "rate": defaultRate,
                               },
                             ];
                             _taxRateControllers.add(
                               TextEditingController(
-                                text: widget.taxRates[defaultTax] ?? "",
+                                text: defaultRate,
                               ),
                             );
                           }
@@ -3096,6 +3189,9 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                                                     const TextInputType.numberWithOptions(
                                                       decimal: true,
                                                     ),
+                                                inputFormatters: [
+                                                  _percentageLimit100InputFormatter(),
+                                                ],
                                                 onChanged: (value) =>
                                                     _onTaxRateChanged(
                                                       index,
@@ -3400,7 +3496,7 @@ class _CreateRequestSummaryRow extends StatelessWidget {
             text: TextSpan(
               style: TextStyle(
                 fontSize: isBold ? 16 : 12,
-                fontWeight: FontWeight.w500,
+                fontWeight:isBold ?  FontWeight.w700 :FontWeight.w500,
                 color: labelColor ?? Colors.black,
               ),
               children: [

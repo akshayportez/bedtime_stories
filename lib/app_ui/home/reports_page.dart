@@ -163,8 +163,9 @@ class _PaymentRequestReportSheet extends StatefulWidget {
 }
 
 class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> {
-  int? _selectedProjectId;
-  String _selectedProjectName = "";
+  Set<int> _selectedProjectIds = <int>{};
+  bool _isAllProjectsSelected = true;
+  String _selectedProjectName = "All";
   Set<int> _selectedAccountIds = <int>{};
   bool _isAllAccountsSelected = true;
   String _selectedAccountName = "All";
@@ -227,11 +228,20 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     setState(() {
-      _projectName = initial?.projectName.isNotEmpty == true
+      final initialProjectIds = initial?.projectIds ?? const <int>[];
+      if (initialProjectIds.isNotEmpty) {
+        _selectedProjectIds = {...initialProjectIds};
+        _isAllProjectsSelected = false;
+      } else if (projectId != 0) {
+        _selectedProjectIds = <int>{projectId};
+        _isAllProjectsSelected = false;
+      } else {
+        _selectedProjectIds = <int>{};
+        _isAllProjectsSelected = true;
+      }
+      _projectName = (initial?.projectName ?? "").trim().isNotEmpty
           ? initial!.projectName
-          : name;
-      _selectedProjectId =
-          initial?.projectId ?? (projectId == 0 ? null : projectId);
+          : (projectId == 0 ? "All" : name);
       _selectedProjectName = _projectName;
       final initialAccountIds = initial?.accountIds ?? const <int>[];
       _selectedAccountIds = {...initialAccountIds};
@@ -308,6 +318,58 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
     );
     if (picked == null || !mounted) return;
     setState(() => _toDate = picked);
+  }
+
+  List<String> _selectedProjectNamesFrom(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) {
+      return const <String>[];
+    }
+    final names = <String>[];
+    for (final item in projects) {
+      if (_selectedProjectIds.contains(item.nProjectId)) {
+        names.add(item.cProjectName);
+      }
+    }
+    return names;
+  }
+
+  String _projectFieldLabel(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) return "All";
+    final names = _selectedProjectNamesFrom(projects);
+    if (names.isEmpty) {
+      return _selectedProjectName.isEmpty ? "All" : _selectedProjectName;
+    }
+    if (names.length == 1) return names.first;
+    return "${names.first} +${names.length - 1}";
+  }
+
+  String _projectFilterLabel(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) return "All";
+    final names = _selectedProjectNamesFrom(projects);
+    if (names.isEmpty) {
+      return _selectedProjectName.isEmpty ? "All" : _selectedProjectName;
+    }
+    return names.join(", ");
+  }
+
+  Future<void> _openProjectPicker(List<BedtimeProject> projects) async {
+    final result = await showModalBottomSheet<_ProjectMultiSelectResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProjectMultiSelectSheet(
+        projects: projects,
+        initialAllSelected: _isAllProjectsSelected,
+        initialSelectedIds: _selectedProjectIds,
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _isAllProjectsSelected = result.isAllSelected;
+      _selectedProjectIds = {...result.selectedIds};
+      _selectedProjectName = _projectFilterLabel(projects);
+      _projectName = _selectedProjectName;
+    });
   }
 
   List<String> _selectedAccountNamesFrom(
@@ -594,51 +656,64 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
               ),
               const SizedBox(height: 4),
               _ReportDropdownField(
-                hint: _projectName.isEmpty ? "Project" : _projectName,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    isExpanded: true,
-                    value: projects.any((e) => e.nProjectId == _selectedProjectId)
-                        ? _selectedProjectId
-                        : null,
-                    hint: Text(
-                      _projectName.isEmpty ? "Project" : _projectName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF7F7F7F),
-                      ),
-                    ),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                    items: projects
-                        .map(
-                          (item) => DropdownMenuItem<int>(
-                            value: item.nProjectId,
-                            child: Text(
-                              item.cProjectName,
-                              style: const TextStyle(fontSize: 13),
-                            ),
+                hint: _projectFieldLabel(projects),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (projects.isEmpty) return;
+                    _openProjectPicker(projects);
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _projectFieldLabel(projects),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (v) async {
-                      if (v == null || projects.isEmpty) return;
-                      final selected = projects.firstWhere(
-                        (e) => e.nProjectId == v,
-                        orElse: () => projects.first,
-                      );
-                      setState(() {
-                        _selectedProjectId = v;
-                        _projectName = selected.cProjectName;
-                        _selectedProjectName = selected.cProjectName;
-                      });
-                      await BedtimeLocalStorage.saveSelectedProject(
-                        projectId: selected.nProjectId,
-                        projectName: selected.cProjectName,
-                      );
-                    },
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, size: 18),
+                    ],
                   ),
                 ),
               ),
+              if (!_isAllProjectsSelected &&
+                  _selectedProjectNamesFrom(projects).isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _selectedProjectNamesFrom(projects)
+                      .map(
+                        (name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF4FE),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFD0E5FA),
+                            ),
+                          ),
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF0B5E9C),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
@@ -847,18 +922,12 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
                       ),
                     ),
                     onPressed: () {
-                      var projectName = _selectedProjectName;
-                      if (projectName.isEmpty) {
-                        for (final item in projects) {
-                          if (item.nProjectId == _selectedProjectId) {
-                            projectName = item.cProjectName;
-                            break;
-                          }
-                        }
-                      }
-                      if (projectName.isEmpty) {
-                        projectName = _projectName;
-                      }
+                      final selectedProjectIds = _isAllProjectsSelected
+                          ? <int>[]
+                          : (_selectedProjectIds.toList()..sort());
+                      final projectName = _isAllProjectsSelected
+                          ? "All"
+                          : _projectFilterLabel(projects);
 
                       final selectedAccountIds = _isAllAccountsSelected
                           ? <int>[]
@@ -888,7 +957,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
                           : _userFilterLabel(users);
 
                       final filters = PaymentRequestReportFilters(
-                        projectId: _selectedProjectId,
+                        projectIds: selectedProjectIds,
                         projectName: projectName,
                         status: _selectedStatus,
                         fromDate: _fromDate,
@@ -915,6 +984,268 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectMultiSelectResult {
+  final bool isAllSelected;
+  final List<int> selectedIds;
+
+  const _ProjectMultiSelectResult({
+    required this.isAllSelected,
+    required this.selectedIds,
+  });
+}
+
+class _ProjectMultiSelectSheet extends StatefulWidget {
+  final List<BedtimeProject> projects;
+  final bool initialAllSelected;
+  final Set<int> initialSelectedIds;
+
+  const _ProjectMultiSelectSheet({
+    required this.projects,
+    required this.initialAllSelected,
+    required this.initialSelectedIds,
+  });
+
+  @override
+  State<_ProjectMultiSelectSheet> createState() => _ProjectMultiSelectSheetState();
+}
+
+class _ProjectMultiSelectSheetState extends State<_ProjectMultiSelectSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  late bool _isAllSelected;
+  late Set<int> _selectedIds;
+  String _searchQuery = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _isAllSelected = widget.initialAllSelected;
+    _selectedIds = {...widget.initialSelectedIds};
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<BedtimeProject> _filteredProjects() {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return widget.projects;
+    return widget.projects
+        .where((item) => item.cProjectName.toLowerCase().contains(query))
+        .toList();
+  }
+
+  void _toggleAll(bool value) {
+    setState(() {
+      _isAllSelected = value;
+      if (value) {
+        _selectedIds.clear();
+      }
+    });
+  }
+
+  void _toggleProject(int projectId, bool value) {
+    setState(() {
+      _isAllSelected = false;
+      if (value) {
+        _selectedIds.add(projectId);
+      } else {
+        _selectedIds.remove(projectId);
+        if (_selectedIds.isEmpty) {
+          _isAllSelected = true;
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final filteredProjects = _filteredProjects();
+
+    return FractionallySizedBox(
+      heightFactor: 0.78,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 14 + bottomPadding),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Select Project",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.close, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFCCDDEB)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
+                        decoration: const InputDecoration(
+                          hintText: "Search project",
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF7F7F7F),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: () => _toggleAll(!_isAllSelected),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _isAllSelected,
+                      onChanged: (value) => _toggleAll(value ?? false),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      "All",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              const SizedBox(height: 6),
+              Expanded(
+                child: filteredProjects.isEmpty
+                    ? const Center(
+                        child: Text(
+                          "No projects found",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredProjects.length,
+                        itemBuilder: (context, index) {
+                          final project = filteredProjects[index];
+                          final isChecked =
+                              !_isAllSelected &&
+                              _selectedIds.contains(project.nProjectId);
+                          return InkWell(
+                            onTap: () =>
+                                _toggleProject(project.nProjectId, !isChecked),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: isChecked,
+                                  onChanged: (value) => _toggleProject(
+                                    project.nProjectId,
+                                    value ?? false,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    project.cProjectName,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel"),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 88,
+                    height: 38,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0B94F8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        final ids = _selectedIds.toList()..sort();
+                        Navigator.pop(
+                          context,
+                          _ProjectMultiSelectResult(
+                            isAllSelected: _isAllSelected || ids.isEmpty,
+                            selectedIds: _isAllSelected ? const [] : ids,
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Apply",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2160,8 +2491,9 @@ class _VoucherReportSheet extends StatefulWidget {
 }
 
 class _VoucherReportSheetState extends State<_VoucherReportSheet> {
-  int? _selectedProjectId;
-  String _selectedProjectName = "";
+  Set<int> _selectedProjectIds = <int>{};
+  bool _isAllProjectsSelected = true;
+  String _selectedProjectName = "All";
   Set<int> _selectedAccountIds = <int>{};
   bool _isAllAccountsSelected = true;
   String _selectedAccountName = "All";
@@ -2236,11 +2568,20 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     setState(() {
-      _projectName = initial?.projectName.isNotEmpty == true
+      final initialProjectIds = initial?.projectIds ?? const <int>[];
+      if (initialProjectIds.isNotEmpty) {
+        _selectedProjectIds = {...initialProjectIds};
+        _isAllProjectsSelected = false;
+      } else if (projectId != 0) {
+        _selectedProjectIds = <int>{projectId};
+        _isAllProjectsSelected = false;
+      } else {
+        _selectedProjectIds = <int>{};
+        _isAllProjectsSelected = true;
+      }
+      _projectName = (initial?.projectName ?? "").trim().isNotEmpty
           ? initial!.projectName
-          : name;
-      _selectedProjectId =
-          initial?.projectId ?? (projectId == 0 ? null : projectId);
+          : (projectId == 0 ? "All" : name);
       _selectedProjectName = _projectName;
       final initialAccountIds = initial?.accountIds ?? const <int>[];
       _selectedAccountIds = {...initialAccountIds};
@@ -2330,6 +2671,58 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
     );
     if (picked == null || !mounted) return;
     setState(() => _toDate = picked);
+  }
+
+  List<String> _selectedProjectNamesFrom(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) {
+      return const <String>[];
+    }
+    final names = <String>[];
+    for (final item in projects) {
+      if (_selectedProjectIds.contains(item.nProjectId)) {
+        names.add(item.cProjectName);
+      }
+    }
+    return names;
+  }
+
+  String _projectFieldLabel(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) return "All";
+    final names = _selectedProjectNamesFrom(projects);
+    if (names.isEmpty) {
+      return _selectedProjectName.isEmpty ? "All" : _selectedProjectName;
+    }
+    if (names.length == 1) return names.first;
+    return "${names.first} +${names.length - 1}";
+  }
+
+  String _projectFilterLabel(List<BedtimeProject> projects) {
+    if (_isAllProjectsSelected || _selectedProjectIds.isEmpty) return "All";
+    final names = _selectedProjectNamesFrom(projects);
+    if (names.isEmpty) {
+      return _selectedProjectName.isEmpty ? "All" : _selectedProjectName;
+    }
+    return names.join(", ");
+  }
+
+  Future<void> _openProjectPicker(List<BedtimeProject> projects) async {
+    final result = await showModalBottomSheet<_ProjectMultiSelectResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProjectMultiSelectSheet(
+        projects: projects,
+        initialAllSelected: _isAllProjectsSelected,
+        initialSelectedIds: _selectedProjectIds,
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _isAllProjectsSelected = result.isAllSelected;
+      _selectedProjectIds = {...result.selectedIds};
+      _selectedProjectName = _projectFilterLabel(projects);
+      _projectName = _selectedProjectName;
+    });
   }
 
   List<String> _selectedAccountNamesFrom(
@@ -2616,50 +3009,64 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
               ),
               const SizedBox(height: 4),
               _ReportDropdownField(
-                hint: _projectName.isEmpty ? "Project" : _projectName,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    isExpanded: true,
-                    value: projects.any((e) => e.nProjectId == _selectedProjectId)
-                        ? _selectedProjectId
-                        : null,
-                    hint: Text(
-                      _projectName.isEmpty ? "Project" : _projectName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF7F7F7F),
-                      ),
-                    ),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                    items: projects
-                        .map(
-                          (item) => DropdownMenuItem<int>(
-                            value: item.nProjectId,
-                            child: Text(
-                              item.cProjectName,
-                              style: const TextStyle(fontSize: 13),
-                            ),
+                hint: _projectFieldLabel(projects),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (projects.isEmpty) return;
+                    _openProjectPicker(projects);
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _projectFieldLabel(projects),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (v) async {
-                      if (v == null || projects.isEmpty) return;
-                      final selected = projects.firstWhere(
-                        (e) => e.nProjectId == v,
-                        orElse: () => projects.first,
-                      );
-                      setState(() {
-                        _selectedProjectId = v;
-                        _projectName = selected.cProjectName;
-                      });
-                      await BedtimeLocalStorage.saveSelectedProject(
-                        projectId: selected.nProjectId,
-                        projectName: selected.cProjectName,
-                      );
-                    },
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, size: 18),
+                    ],
                   ),
                 ),
               ),
+              if (!_isAllProjectsSelected &&
+                  _selectedProjectNamesFrom(projects).isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _selectedProjectNamesFrom(projects)
+                      .map(
+                        (name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF4FE),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFD0E5FA),
+                            ),
+                          ),
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF0B5E9C),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -2864,18 +3271,12 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
                       ),
                     ),
                     onPressed: () {
-                      var projectName = _selectedProjectName;
-                      if (projectName.isEmpty) {
-                        for (final item in projects) {
-                          if (item.nProjectId == _selectedProjectId) {
-                            projectName = item.cProjectName;
-                            break;
-                          }
-                        }
-                      }
-                      if (projectName.isEmpty) {
-                        projectName = _projectName;
-                      }
+                      final selectedProjectIds = _isAllProjectsSelected
+                          ? <int>[]
+                          : (_selectedProjectIds.toList()..sort());
+                      final projectName = _isAllProjectsSelected
+                          ? "All"
+                          : _projectFilterLabel(projects);
 
                       final selectedAccountIds = _isAllAccountsSelected
                           ? <int>[]
@@ -2905,7 +3306,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
                           : _userFilterLabel(users);
 
                       final filters = VoucherReportFilters(
-                        projectId: _selectedProjectId,
+                        projectIds: selectedProjectIds,
                         projectName: projectName,
                         fromDate: _fromDate,
                         toDate: _toDate,
@@ -2942,7 +3343,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
 }
 
 class PaymentRequestReportFilters {
-  final int? projectId;
+  final List<int> projectIds;
   final String projectName;
   final String status;
   final DateTime? fromDate;
@@ -2957,7 +3358,7 @@ class PaymentRequestReportFilters {
   final String userName;
 
   const PaymentRequestReportFilters({
-    required this.projectId,
+    required this.projectIds,
     required this.projectName,
     required this.status,
     required this.fromDate,
@@ -3023,11 +3424,6 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
     return "$y-$m-$d";
   }
 
-  String _idString(int? id) {
-    if (id == null || id == 0) return "";
-    return id.toString();
-  }
-
   String _idsString(List<int> ids) {
     if (ids.isEmpty) return "";
     return ids.where((id) => id > 0).map((id) => id.toString()).join(",");
@@ -3048,7 +3444,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
     context.read<BedtimePaymentRequestReportBloc>().add(
           BedtimePaymentRequestReportLoadRequested(
             companyId: 1,
-            projectIds: _idString(selected.projectId),
+            projectIds: _idsString(selected.projectIds),
             status: _statusApiValue(selected.status),
             dFrom: _formatApiDate(selected.fromDate),
             dTo: _formatApiDate(selected.toDate),
@@ -3452,7 +3848,7 @@ class _PaymentRequestReportPageState extends State<PaymentRequestReportPage> {
 }
 
 class VoucherReportFilters {
-  final int? projectId;
+  final List<int> projectIds;
   final String projectName;
   final DateTime? fromDate;
   final DateTime? toDate;
@@ -3467,7 +3863,7 @@ class VoucherReportFilters {
   final String payMode;
 
   const VoucherReportFilters({
-    required this.projectId,
+    required this.projectIds,
     required this.projectName,
     required this.fromDate,
     required this.toDate,
@@ -3533,11 +3929,6 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
     return "$y-$m-$d";
   }
 
-  String _idString(int? id) {
-    if (id == null || id == 0) return "";
-    return id.toString();
-  }
-
   String _idsString(List<int> ids) {
     if (ids.isEmpty) return "";
     return ids.where((id) => id > 0).map((id) => id.toString()).join(",");
@@ -3556,7 +3947,7 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
     context.read<BedtimeVoucherReportBloc>().add(
           BedtimeVoucherReportLoadRequested(
             companyId: 1,
-            projectIds: _idString(selected.projectId),
+            projectIds: _idsString(selected.projectIds),
             dFrom: _formatApiDate(selected.fromDate),
             dTo: _formatApiDate(selected.toDate),
             accountIds: _idsString(selected.accountIds),

@@ -305,19 +305,50 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                     section: request.cSectionName,
                                   ),
                                   const SizedBox(height: 10),
-                                  Text(
-                                    'Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF222222),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'Requested Amount : ',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF232323),
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              '${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: Color(0xFF666666),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    'TDS : ${_money(tdsPercent)} %',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF222222),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'TDS : ',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF232323),
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: '${_money(tdsPercent)} %',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: Color(0xFF666666),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -325,8 +356,8 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                     'Tax Details',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF232323),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -336,8 +367,8 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                     'Comments :',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF232323),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -346,7 +377,7 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                     style: const TextStyle(
                                       fontSize: 14,
                                       height: 1.3,
-                                      color: Color(0xFF444444),
+                                      color: Color(0xFF6A6A6A),
                                     ),
                                   ),
                                   const SizedBox(height: 14),
@@ -354,8 +385,8 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
                                     'Uploaded Files',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF232323),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
