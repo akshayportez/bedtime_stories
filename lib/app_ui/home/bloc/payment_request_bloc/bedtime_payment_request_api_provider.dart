@@ -11,6 +11,7 @@ class BedtimePaymentRequestApiProvider {
     required int userActionId,
     String search = "",
     String statusFilter = "",
+    String cStatus = "",
     String dFrom = "",
     String dTo = "",
   }) {
@@ -26,6 +27,7 @@ class BedtimePaymentRequestApiProvider {
         "nUserActionId": userActionId,
         "search": search,
         "statusFilter": statusFilter,
+        "cStatus": cStatus,
         "dFrom": dFrom,
         "dTo": dTo,
       },

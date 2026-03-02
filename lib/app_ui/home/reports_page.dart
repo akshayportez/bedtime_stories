@@ -1493,37 +1493,9 @@ class _AccountMultiSelectSheetState extends State<_AccountMultiSelectSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFCCDDEB)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: const InputDecoration(
-                          hintText: "Search account",
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7F7F7F),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
+              _RequestSearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
               const SizedBox(height: 10),
               InkWell(
@@ -1756,37 +1728,9 @@ class _CategoryMultiSelectSheetState extends State<_CategoryMultiSelectSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFCCDDEB)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: const InputDecoration(
-                          hintText: "Search category",
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7F7F7F),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
+              _RequestSearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
               const SizedBox(height: 10),
               InkWell(
@@ -2019,37 +1963,9 @@ class _SectionMultiSelectSheetState extends State<_SectionMultiSelectSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFCCDDEB)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: const InputDecoration(
-                          hintText: "Search section",
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7F7F7F),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
+              _RequestSearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
               const SizedBox(height: 10),
               InkWell(
@@ -2310,37 +2226,9 @@ class _UserMultiSelectSheetState extends State<_UserMultiSelectSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFCCDDEB)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: const InputDecoration(
-                          hintText: "Search user",
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7F7F7F),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
+              _RequestSearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
               const SizedBox(height: 10),
               InkWell(

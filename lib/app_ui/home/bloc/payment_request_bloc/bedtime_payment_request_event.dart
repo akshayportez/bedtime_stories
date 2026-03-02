@@ -11,6 +11,7 @@ class BedtimePaymentRequestLoadRequested extends BedtimePaymentRequestEvent {
   final int userActionId;
   final String search;
   final String statusFilter;
+  final String cStatus;
   final String dFrom;
   final String dTo;
 
@@ -20,6 +21,7 @@ class BedtimePaymentRequestLoadRequested extends BedtimePaymentRequestEvent {
     required this.userActionId,
     this.search = "",
     this.statusFilter = "",
+    this.cStatus = "",
     this.dFrom = "",
     this.dTo = "",
   });
@@ -31,6 +33,7 @@ class BedtimePaymentRequestSearchRequested extends BedtimePaymentRequestEvent {
   final int userActionId;
   final String search;
   final String statusFilter;
+  final String cStatus;
   final String dFrom;
   final String dTo;
 
@@ -40,6 +43,7 @@ class BedtimePaymentRequestSearchRequested extends BedtimePaymentRequestEvent {
     required this.userActionId,
     required this.search,
     this.statusFilter = "",
+    this.cStatus = "",
     this.dFrom = "",
     this.dTo = "",
   });

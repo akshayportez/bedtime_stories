@@ -26,6 +26,7 @@ class BedtimePaymentRequestBloc
         userActionId: event.userActionId,
         search: event.search,
         statusFilter: event.statusFilter,
+        cStatus: event.cStatus,
         dFrom: event.dFrom,
         dTo: event.dTo,
       );
@@ -51,6 +52,7 @@ class BedtimePaymentRequestBloc
         userActionId: event.userActionId,
         search: event.search,
         statusFilter: event.statusFilter,
+        cStatus: event.cStatus,
         dFrom: event.dFrom,
         dTo: event.dTo,
       );

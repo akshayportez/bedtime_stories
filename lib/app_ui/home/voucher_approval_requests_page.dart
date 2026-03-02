@@ -42,6 +42,7 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
         userActionId: _userActionId,
         search: "",
         statusFilter: "Approved",
+        // cStatus: "Approved",
       ),
     );
   }
@@ -54,6 +55,7 @@ class _VoucherApprovalRequestsPageState extends State<VoucherApprovalRequestsPag
         userActionId: _userActionId,
         search: value.trim(),
         statusFilter: "Approved",
+        // cStatus: "Approved",
       ),
     );
   }

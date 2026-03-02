@@ -13,6 +13,7 @@ class BedtimePaymentRequestRepository {
     required int userActionId,
     String search = "",
     String statusFilter = "",
+    String cStatus = "",
     String dFrom = "",
     String dTo = "",
   }) async {
@@ -23,6 +24,7 @@ class BedtimePaymentRequestRepository {
         userActionId: userActionId,
         search: search,
         statusFilter: statusFilter,
+        cStatus: cStatus,
         dFrom: dFrom,
         dTo: dTo,
       );
