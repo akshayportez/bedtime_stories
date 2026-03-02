@@ -37,6 +37,18 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
     );
   }
 
+  Future<void> _logout() async {
+    await BedtimeLocalStorage.clearSession();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,11 +107,15 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                           .toList();
 
                       if (activeProjects.isEmpty) {
+                        if (searchText.isEmpty) {
+                          return _NoProjectsAssignedState(
+                            onLogoutTap: _logout,
+                          );
+                        }
+
                         return Center(
                           child: Text(
-                            searchText.isNotEmpty
-                                ? 'No project with name "$searchText"'
-                                : "No projects available",
+                            'No project with name "$searchText"',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 14,
@@ -275,6 +291,60 @@ class _ProjectTile extends StatelessWidget {
             fontWeight: FontWeight.w400,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NoProjectsAssignedState extends StatelessWidget {
+  final VoidCallback onLogoutTap;
+
+  const _NoProjectsAssignedState({required this.onLogoutTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.move_to_inbox_rounded,
+            size: 64,
+            color: Color(0xFFC7CFDA),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "No projects found.",
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF777777),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 36,
+            width: 100,
+            child: ElevatedButton(
+              onPressed: onLogoutTap,
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: const Color(0xFF108DF0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "Logout",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

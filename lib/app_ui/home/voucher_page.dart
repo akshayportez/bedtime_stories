@@ -11,23 +11,17 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   final TextEditingController _searchController = TextEditingController();
   late final BedtimePaymentVoucherBloc _voucherBloc;
   bool _isRouteObserverSubscribed = false;
+  bool _permissionsLoaded = false;
+  bool _canViewVoucherPage = false;
+  bool _canViewVoucherDetailPage = false;
   int _projectId = 0;
   int? _userActionId;
   String _payModeFilter = "";
   String _dFrom = "";
   String _dTo = "";
 
-  int _resolveInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    return int.tryParse(value?.toString() ?? "") ?? fallback;
-  }
-
   Future<int?> _getStoredUserId() async {
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue =
-        userData["userId"] ?? userData["nUserId"] ?? userData["userID"];
-    final resolved = _resolveInt(userIdValue);
-    return resolved > 0 ? resolved : null;
+    return BedtimeLocalStorage.getUserId();
   }
 
   @override
@@ -39,7 +33,10 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
       _handleSelectedProjectChanged,
     );
-    _loadVouchers();
+    BedtimeLocalStorage.paymentDataChangeNotifier.addListener(
+      _handlePaymentDataChanged,
+    );
+    _initializePage();
   }
 
   @override
@@ -66,16 +63,42 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
     BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
       _handleSelectedProjectChanged,
     );
+    BedtimeLocalStorage.paymentDataChangeNotifier.removeListener(
+      _handlePaymentDataChanged,
+    );
     _voucherBloc.close();
     _searchController.dispose();
     super.dispose();
   }
 
   void _handleSelectedProjectChanged() {
+    if (!_canViewVoucherPage) return;
     unawaited(_loadVouchers());
   }
 
+  void _handlePaymentDataChanged() {
+    if (!_canViewVoucherPage) return;
+    unawaited(_loadVouchers());
+  }
+
+  Future<void> _initializePage() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewVoucherPage = permissionSet.contains("paymentvoucher");
+    final canViewVoucherDetailPage = permissionSet.contains(
+      "transaction-paymentvoucher-view",
+    );
+    if (!mounted) return;
+    setState(() {
+      _canViewVoucherPage = canViewVoucherPage;
+      _canViewVoucherDetailPage = canViewVoucherDetailPage;
+      _permissionsLoaded = true;
+    });
+    if (!canViewVoucherPage) return;
+    await _loadVouchers();
+  }
+
   Future<void> _loadVouchers() async {
+    if (!_canViewVoucherPage) return;
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
     final userActionId = await _getStoredUserId();
     _projectId = projectId;
@@ -171,6 +194,7 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
   }
 
   Future<void> _openFilterSheet() async {
+    if (!_canViewVoucherPage) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -250,7 +274,21 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
 
     return Scaffold(
       appBar: BedtimeGradientAppBar(onProjectTap: _openProjectSelectionSheet),
-      body: Padding(
+      body: !_permissionsLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : !_canViewVoucherPage
+              ? const Center(
+                  child: Text(
+                    "No permission to view voucher page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              : Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,6 +397,17 @@ class _VoucherPageState extends State<VoucherPage> with RouteAware {
                           section: voucher.cSectionName,
                           amount: _formatAmount(voucher.nPayableAmount),
                           payMode: voucher.cPaymode,
+                          canOpenDetail: _canViewVoucherDetailPage,
+                          onNoDetailPermission: () {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "No permission to view voucher detail page",
+                                ),
+                              ),
+                            );
+                          },
                           onRefresh: _reloadAfterVoucherChange,
                         );
                       },
@@ -385,6 +434,8 @@ class _VoucherCard extends StatelessWidget {
   final String section;
   final String amount;
   final String payMode;
+  final bool canOpenDetail;
+  final VoidCallback? onNoDetailPermission;
   final Future<void> Function()? onRefresh;
 
   const _VoucherCard({
@@ -396,6 +447,8 @@ class _VoucherCard extends StatelessWidget {
     required this.section,
     required this.amount,
     required this.payMode,
+    required this.canOpenDetail,
+    this.onNoDetailPermission,
     this.onRefresh,
   });
 
@@ -403,6 +456,11 @@ class _VoucherCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
+        if (!canOpenDetail) {
+          onNoDetailPermission?.call();
+          return;
+        }
+
         final shouldReload = await Navigator.push<bool>(
           context,
           MaterialPageRoute(

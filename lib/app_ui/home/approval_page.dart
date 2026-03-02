@@ -10,6 +10,9 @@ class ApprovalPage extends StatefulWidget {
 class _ApprovalPageState extends State<ApprovalPage> {
   final TextEditingController _searchController = TextEditingController();
   late final BedtimePaymentRequestBloc _approvalBloc;
+  bool _permissionsLoaded = false;
+  bool _canViewApprovalPage = false;
+  bool _canViewApprovalDetailPage = false;
   int _projectId = 0;
   int _userActionId = 0;
   String _statusFilter = "";
@@ -25,7 +28,10 @@ class _ApprovalPageState extends State<ApprovalPage> {
     BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
       _handleSelectedProjectChanged,
     );
-    _loadApprovals();
+    BedtimeLocalStorage.paymentDataChangeNotifier.addListener(
+      _handlePaymentDataChanged,
+    );
+    _initializePage();
   }
 
   @override
@@ -33,25 +39,52 @@ class _ApprovalPageState extends State<ApprovalPage> {
     BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
       _handleSelectedProjectChanged,
     );
+    BedtimeLocalStorage.paymentDataChangeNotifier.removeListener(
+      _handlePaymentDataChanged,
+    );
     _approvalBloc.close();
     _searchController.dispose();
     super.dispose();
   }
 
   void _handleSelectedProjectChanged() {
+    if (!_canViewApprovalPage) return;
     unawaited(_loadApprovals());
   }
 
+  void _handlePaymentDataChanged() {
+    if (!_canViewApprovalPage) return;
+    unawaited(_loadApprovals());
+  }
+
+  Future<void> _initializePage() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewApprovalPage = permissionSet.contains("paymentapproval");
+    final canViewApprovalDetailPage =
+        permissionSet.contains("transaction-paymentapproval-view");
+    if (!mounted) return;
+    setState(() {
+      _canViewApprovalPage = canViewApprovalPage;
+      _canViewApprovalDetailPage = canViewApprovalDetailPage;
+      _permissionsLoaded = true;
+    });
+    if (!canViewApprovalPage) return;
+    await _loadApprovals();
+  }
+
+  Future<int?> _getStoredUserId() async {
+    return BedtimeLocalStorage.getUserId();
+  }
+
   Future<void> _loadApprovals() async {
+    if (!_canViewApprovalPage) return;
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue = userData["userId"];
+    final userIdValue = await _getStoredUserId();
     _projectId = projectId;
-    _userActionId = userIdValue is int
-        ? userIdValue
-        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+    _userActionId = userIdValue ?? 0;
 
     if (!mounted) return;
+    if (_userActionId <= 0) return;
 
     _approvalBloc.add(
       BedtimePaymentRequestLoadRequested(
@@ -84,13 +117,11 @@ class _ApprovalPageState extends State<ApprovalPage> {
   }
 
   void _onSearchChanged(String value) {
+    if (!_canViewApprovalPage) return;
     if (_userActionId == 0) {
-      BedtimeLocalStorage.getUserData().then((userData) {
+      _getStoredUserId().then((resolvedUserId) {
         if (!mounted) return;
-        final userIdValue = userData["userId"];
-        final resolvedUserId = userIdValue is int
-            ? userIdValue
-            : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
+        if (resolvedUserId == null || resolvedUserId <= 0) return;
         _userActionId = resolvedUserId;
         _approvalBloc.add(
           BedtimePaymentRequestSearchRequested(
@@ -136,6 +167,7 @@ class _ApprovalPageState extends State<ApprovalPage> {
   }
 
   Future<void> _openFilterSheet() async {
+    if (!_canViewApprovalPage) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -205,7 +237,21 @@ class _ApprovalPageState extends State<ApprovalPage> {
 
     return Scaffold(
       appBar: BedtimeGradientAppBar(onProjectTap: _openProjectSelectionSheet),
-      body: Padding(
+      body: !_permissionsLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : !_canViewApprovalPage
+              ? const Center(
+                  child: Text(
+                    "No permission to view approval page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              : Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,6 +352,17 @@ class _ApprovalPageState extends State<ApprovalPage> {
                             final request = approvals[index];
                             return GestureDetector(
                               onTap: () async {
+                                if (!_canViewApprovalDetailPage) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "No permission to view approval detail page",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 final updated = await Navigator.push<bool>(
                                   context,
                                   MaterialPageRoute(

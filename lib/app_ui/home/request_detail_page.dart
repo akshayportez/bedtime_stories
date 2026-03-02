@@ -14,6 +14,10 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   bool _showApprovedRequestDetails = false;
   bool _showRejectedRequestDetails = false;
   bool _showPaidRequestDetails = false;
+  bool _permissionsLoaded = false;
+  bool _canViewDetail = false;
+  bool _canEditRequest = false;
+  bool _canDeleteRequest = false;
 
   String get _status => widget.request.cStatus.trim();
 
@@ -58,6 +62,32 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   @override
   void initState() {
     super.initState();
+    _loadPermissionsAndData();
+  }
+
+  Future<void> _loadPermissionsAndData() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewDetail = permissionSet.contains(
+      "transaction-paymentrequest-view",
+    );
+    final canEditRequest = permissionSet.contains(
+      "transaction-paymentrequest-edit",
+    );
+    final canDeleteRequest = permissionSet.contains(
+      "transaction-paymentrequest-delete",
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _canViewDetail = canViewDetail;
+      _canEditRequest = canEditRequest;
+      _canDeleteRequest = canDeleteRequest;
+      _permissionsLoaded = true;
+    });
+
+    if (!canViewDetail) return;
+
     context.read<BedtimePaymentRequestDetailBloc>().add(
       BedtimePaymentRequestDetailLoadRequested(
         companyId: 1,
@@ -76,6 +106,14 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   }
 
   Future<void> _showDeleteDialog() async {
+    if (!_canDeleteRequest) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No rights to delete request")),
+      );
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -163,6 +201,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                         payReqId: widget.request.nPayReqId,
                                       );
                                   if (!mounted) return;
+                                  BedtimeLocalStorage.notifyPaymentDataChanged();
                                   Navigator.pop(context);
                                   Navigator.pop(context, "deleted");
                                 } catch (e) {
@@ -206,6 +245,14 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
     required BedtimePaymentRequestDetail? detail,
     required List<BedtimePaymentRequestTax> taxes,
   }) async {
+    if (!_canEditRequest) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("No rights to edit request")));
+      return;
+    }
+
     if (detail == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please wait, request details are loading")),
@@ -233,6 +280,9 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   Widget build(BuildContext context) {
     final request = widget.request;
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final canShowActionSection = (_isRequested || _isRejected) && _canViewDetail;
+    final showEditAction = canShowActionSection && _canEditRequest;
+    final showDeleteAction = canShowActionSection && _canDeleteRequest;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -244,6 +294,24 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
               onBack: () => Navigator.pop(context),
               onEdit: null,
             ),
+
+            if (!_permissionsLoaded)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (!_canViewDetail)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    "No rights to view request detail page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              )
+            else ...[
 
             if (_isApproved)
               _ExpandableStatusBanner(
@@ -548,13 +616,12 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                             tds: _money(tdsAmount),
                             tax: _money(taxAmount),
                             payable: _money(payableAmount),
-                            showActions: _isRequested || _isRejected,
-                            onEdit: _isRequested || _isRejected
+                            showEditAction: showEditAction,
+                            showDeleteAction: showDeleteAction,
+                            onEdit: showEditAction
                                 ? () => _openEditPage(detail: detail, taxes: taxes)
                                 : null,
-                            onDelete: _isRequested || _isRejected
-                                ? _showDeleteDialog
-                                : null,
+                            onDelete: showDeleteAction ? _showDeleteDialog : null,
                             onPrimary: null,
                             primaryLabel: null,
                             bottomPadding: bottomInset,
@@ -564,6 +631,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                     },
                   ),
             ),
+            ],
           ],
         ),
       ),
@@ -1228,7 +1296,8 @@ class _RequestSummaryBar extends StatelessWidget {
   final String tds;
   final String tax;
   final String payable;
-  final bool showActions;
+  final bool showEditAction;
+  final bool showDeleteAction;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPrimary;
@@ -1240,7 +1309,8 @@ class _RequestSummaryBar extends StatelessWidget {
     required this.tds,
     required this.tax,
     required this.payable,
-    required this.showActions,
+    required this.showEditAction,
+    required this.showDeleteAction,
     required this.onEdit,
     required this.onDelete,
     required this.onPrimary,
@@ -1294,9 +1364,7 @@ class _RequestSummaryBar extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (showActions) ...[
-                   
-                  
+                  if (showEditAction) ...[
                     GestureDetector(
                       onTap: onEdit,
                       child: Container(
@@ -1314,8 +1382,11 @@ class _RequestSummaryBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                      const SizedBox(width: 10),
-                     GestureDetector(
+                  ],
+                  if (showEditAction && showDeleteAction)
+                    const SizedBox(width: 10),
+                  if (showDeleteAction)
+                    GestureDetector(
                       onTap: onDelete,
                       child: Container(
                         width: 42,
@@ -1331,9 +1402,9 @@ class _RequestSummaryBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ],
                   if (onPrimary != null && primaryLabel != null) ...[
-                    if (showActions) const SizedBox(width: 16),
+                    if (showEditAction || showDeleteAction)
+                      const SizedBox(width: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 28,

@@ -360,6 +360,7 @@ class _VoucherApprovalRequestDetailPageState
           await _refreshRequestPageData();
 
           if (!context.mounted) return;
+          BedtimeLocalStorage.notifyPaymentDataChanged();
           Navigator.pop(context, true);
           return;
         }
@@ -467,6 +468,7 @@ class _VoucherApprovalRequestDetailPageState
                                     account: request.cAccountName,
                                     category: request.cCategoryName,
                                     section: request.cSectionName,
+                                    titleFontWeight: FontWeight.w600,
                                   ),
                                   const SizedBox(height: 10),
                                   Text.rich(
@@ -475,7 +477,7 @@ class _VoucherApprovalRequestDetailPageState
                                         const TextSpan(
                                           text: "Requested Amount",
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w500,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                         TextSpan(
@@ -490,8 +492,20 @@ class _VoucherApprovalRequestDetailPageState
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    "TDS : ${_money(tdsPercent)} %",
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: "TDS",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: " : ${_money(tdsPercent)} %",
+                                        ),
+                                      ],
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFF222222),
@@ -502,12 +516,15 @@ class _VoucherApprovalRequestDetailPageState
                                     "Tax Details",
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                       color: Colors.black,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  _ApprovalTaxTable(taxes: taxes),
+                                  _ApprovalTaxTable(
+                                    taxes: taxes,
+                                    headerFontWeight: FontWeight.w700,
+                                  ),
                                   const SizedBox(height: 8),
                                   Text.rich(
                                     TextSpan(
@@ -516,7 +533,7 @@ class _VoucherApprovalRequestDetailPageState
                                           text: "Comment ",
                                           style: TextStyle(
                                             fontSize: 14,
-                                            fontWeight: FontWeight.w500,
+                                            fontWeight: FontWeight.w600,
                                             color: Colors.black,
                                           ),
                                         ),
@@ -537,7 +554,7 @@ class _VoucherApprovalRequestDetailPageState
                                     "Uploaded Files",
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                       color: Colors.black,
                                     ),
                                   ),
@@ -558,7 +575,20 @@ class _VoucherApprovalRequestDetailPageState
                                     ),
                                     const SizedBox(height: 8),
                                   ],
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 14),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF5F6F8),
+                                borderRadius: BorderRadius.circular(0),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
                                   Container(
                                     padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
                                     child: Column(
@@ -593,19 +623,6 @@ class _VoucherApprovalRequestDetailPageState
                                     ),
                                   ),
                                   const SizedBox(height: 14),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF5F6F8),
-                                borderRadius: BorderRadius.circular(0),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
                                   const Text(
                                     "Payment Modes",
                                     style: TextStyle(

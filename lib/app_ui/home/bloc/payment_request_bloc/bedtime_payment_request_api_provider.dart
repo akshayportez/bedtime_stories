@@ -16,6 +16,10 @@ class BedtimePaymentRequestApiProvider {
   }) {
     return _dio.get(
       BedtimeApiEndpoints.paymentRequest,
+      options: Options(
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ),
       queryParameters: {
         "nCompanyId": companyId,
         "nProjectId": projectId,

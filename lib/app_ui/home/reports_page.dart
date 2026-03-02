@@ -8,6 +8,32 @@ class ReportsPage extends StatefulWidget {
 }
 
 class _ReportsPageState extends State<ReportsPage> {
+  bool _isLoadingPermissions = true;
+  bool _canViewReportsPage = false;
+  bool _canViewPaymentRequestReport = false;
+  bool _canViewVoucherReport = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccessRights();
+  }
+
+  Future<void> _loadAccessRights() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewReportsPage = permissionSet.contains("reports");
+    final canViewPaymentRequestReport =
+        permissionSet.contains("payment-request-report");
+    final canViewVoucherReport = permissionSet.contains("voucher-report");
+    if (!mounted) return;
+    setState(() {
+      _canViewReportsPage = canViewReportsPage;
+      _canViewPaymentRequestReport = canViewPaymentRequestReport;
+      _canViewVoucherReport = canViewVoucherReport;
+      _isLoadingPermissions = false;
+    });
+  }
+
   Future<void> _openProjectSelectionSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -63,37 +89,69 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final noVisibleReports =
+        !_canViewPaymentRequestReport && !_canViewVoucherReport;
+
     return Scaffold(
       appBar: BedtimeGradientAppBar(onProjectTap: _openProjectSelectionSheet),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 12),
-            Text(
-              "Reports",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            SizedBox(height: 14),
-            _ReportCard(
-              iconPath: "assets/icons/pay_request_report.png",
-              title: "Payment Request Report",
-              onTap: _openPaymentRequestReportSheet,
-            ),
-            SizedBox(height: 10),
-            _ReportCard(
-              iconPath: "assets/icons/voucher_report.png",
-              title: "Voucher Report",
-              onTap: _openVoucherReportSheet,
-            ),
-          ],
-        ),
-      ),
+      body: _isLoadingPermissions
+          ? const Center(child: CircularProgressIndicator())
+          : !_canViewReportsPage
+              ? const Center(
+                  child: Text(
+                    "No permission to view reports page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      const Text(
+                        "Reports",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (_canViewPaymentRequestReport)
+                        _ReportCard(
+                          iconPath: "assets/icons/pay_request_report.png",
+                          title: "Payment Request Report",
+                          onTap: _openPaymentRequestReportSheet,
+                        ),
+                      if (_canViewPaymentRequestReport &&
+                          _canViewVoucherReport)
+                        const SizedBox(height: 10),
+                      if (_canViewVoucherReport)
+                        _ReportCard(
+                          iconPath: "assets/icons/voucher_report.png",
+                          title: "Voucher Report",
+                          onTap: _openVoucherReportSheet,
+                        ),
+                      if (noVisibleReports) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          "No report permissions available",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF5F5F5F),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
     );
   }
 }
@@ -195,7 +253,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
     _loadProjectName();
     _loadLoggedInUser();
     context.read<BedtimeProjectBloc>().add(
-      BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+      BedtimeProjectLoadRequested(companyId: 1, userId: 0),
     );
     context.read<BedtimeGetAccountsListBloc>().add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
@@ -628,9 +686,10 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
         ),
         child: SafeArea(
           top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Row(
                 children: [
                   const Spacer(),
@@ -908,7 +967,7 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
                   ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
@@ -985,7 +1044,8 @@ class _PaymentRequestReportSheetState extends State<_PaymentRequestReportSheet> 
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1105,37 +1165,9 @@ class _ProjectMultiSelectSheetState extends State<_ProjectMultiSelectSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFCCDDEB)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: const InputDecoration(
-                          hintText: "Search project",
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7F7F7F),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
+              _RequestSearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
               const SizedBox(height: 10),
               InkWell(
@@ -2523,7 +2555,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
     _loadProjectName();
     _loadLoggedInUser();
     context.read<BedtimeProjectBloc>().add(
-      BedtimeProjectLoadRequested(companyId: 1, userId: 1),
+      BedtimeProjectLoadRequested(companyId: 1, userId: 0),
     );
     context.read<BedtimeGetAccountsListBloc>().add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
@@ -2981,9 +3013,10 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
         ),
         child: SafeArea(
           top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Row(
                 children: [
                   const Spacer(),
@@ -3257,7 +3290,7 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
                   ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
@@ -3334,7 +3367,8 @@ class _VoucherReportSheetState extends State<_VoucherReportSheet> {
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -3935,9 +3969,10 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
   }
 
   String _payModeApiValue(String payMode) {
-    final normalized = payMode.trim().toLowerCase();
-    if (normalized.isEmpty || normalized == "all") return "";
-    return normalized;
+    final trimmed = payMode.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == "all") return "";
+    if (trimmed.length == 1) return trimmed.toUpperCase();
+    return "${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}";
   }
 
   String _money(double value) => value.toStringAsFixed(2);
@@ -4159,7 +4194,7 @@ class _VoucherReportPageState extends State<VoucherReportPage> {
                                             label: "Payable Amount",
                                             width: 140,
                                           ),
-                                          _TableHeaderCell(label: "Section", width: 90),
+                                          _TableHeaderCell(label: "Pay Mode", width: 90),
                                         ],
                                       ),
                                       Expanded(

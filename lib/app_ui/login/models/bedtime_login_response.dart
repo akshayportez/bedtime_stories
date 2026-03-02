@@ -21,6 +21,15 @@ class BedtimeLoginResponse {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "nFlag": nFlag,
+      "cMessage": cMessage,
+      "user": user.toJson(),
+      "menuRights": menuRights.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class BedtimeUser {
@@ -47,6 +56,16 @@ class BedtimeUser {
       nCompanyID: json["nCompanyID"] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "nUserId": nUserId,
+      "cCusername": cCusername,
+      "cEmail": cEmail,
+      "bActive": bActive,
+      "nCompanyID": nCompanyID,
+    };
+  }
 }
 
 class MenuRights {
@@ -69,5 +88,14 @@ class MenuRights {
       cMenus: json["cMenus"] ?? "",
       nCompanyID: json["nCompanyID"] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "nUserId": nUserId,
+      "cModule": cModule,
+      "cMenus": cMenus,
+      "nCompanyID": nCompanyID,
+    };
   }
 }

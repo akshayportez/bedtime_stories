@@ -320,6 +320,7 @@ class _VoucherEditPageState extends State<VoucherEditPage> {
           _isSuccessDialogVisible = false;
 
           if (!context.mounted) return;
+          BedtimeLocalStorage.notifyPaymentDataChanged();
           Navigator.pop(context, true);
           return;
         }

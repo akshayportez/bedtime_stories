@@ -15,21 +15,54 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   bool _isSuccessDialogVisible = false;
   bool _isSharingPdf = false;
   bool _isPrintingPdf = false;
+  bool _permissionsLoaded = false;
+  bool _canViewVoucherDetail = false;
+  bool _canEditVoucher = false;
+  bool _canDeleteVoucher = false;
+  bool _canPrintVoucher = false;
+  bool _canShareVoucher = false;
 
   String _money(double value) => value.toStringAsFixed(2);
-  int _resolveInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    return int.tryParse(value?.toString() ?? "") ?? fallback;
-  }
 
   Future<int> _getStoredUserActionId() async {
-    final userData = await BedtimeLocalStorage.getUserData();
-    return _resolveInt(userData["userId"]);
+    return await BedtimeLocalStorage.getUserId() ?? 0;
   }
 
   @override
   void initState() {
     super.initState();
+    _loadPermissionsAndData();
+  }
+
+  Future<void> _loadPermissionsAndData() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewVoucherDetail = permissionSet.contains(
+      "transaction-paymentvoucher-view",
+    );
+    final canEditVoucher = permissionSet.contains(
+      "transaction-paymentvoucher-edit",
+    );
+    final canDeleteVoucher = permissionSet.contains(
+      "transaction-paymentvoucher-delete",
+    );
+    final canPrintVoucher = permissionSet.contains(
+      "transaction-paymentvoucher-print",
+    );
+    final canShareVoucher = permissionSet.contains(
+      "transaction-paymentvoucher-share",
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _canViewVoucherDetail = canViewVoucherDetail;
+      _canEditVoucher = canEditVoucher;
+      _canDeleteVoucher = canDeleteVoucher;
+      _canPrintVoucher = canPrintVoucher;
+      _canShareVoucher = canShareVoucher;
+      _permissionsLoaded = true;
+    });
+
+    if (!canViewVoucherDetail) return;
     _loadVoucherDetail();
   }
 
@@ -133,11 +166,18 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   }
 
   Future<void> _deleteVoucher() async {
+    if (!_canDeleteVoucher) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No permission to delete voucher")),
+      );
+      return;
+    }
+
     if (_isDeleting) return;
     setState(() => _isDeleting = true);
     try {
-      final userData = await BedtimeLocalStorage.getUserData();
-      final userActionId = _resolveInt(userData["userId"]);
+      final userActionId = await _getStoredUserActionId();
 
       await context.read<BedtimePaymentVoucherDetailBloc>().repository
           .deletePaymentVoucher(
@@ -162,6 +202,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
       await _showDeleteSuccessDialog();
       _isSuccessDialogVisible = false;
       if (!mounted) return;
+      BedtimeLocalStorage.notifyPaymentDataChanged();
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -278,6 +319,14 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   }
 
   Future<void> _openEditPage(BedtimePaymentVoucherDetailResponse detail) async {
+    if (!_canEditVoucher) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No permission to edit voucher")),
+      );
+      return;
+    }
+
     final didUpdate = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -409,6 +458,14 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   }
 
   Future<void> _shareVoucherPdf() async {
+    if (!_canShareVoucher) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No permission to share voucher")),
+      );
+      return;
+    }
+
     if (_isSharingPdf) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -450,6 +507,14 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
   }
 
   Future<void> _printVoucherPdf() async {
+    if (!_canPrintVoucher) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No permission to print voucher")),
+      );
+      return;
+    }
+
     if (_isPrintingPdf) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -498,6 +563,23 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
               title: 'Voucher',
               onBack: () => Navigator.pop(context),
             ),
+            if (!_permissionsLoaded)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (!_canViewVoucherDetail)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    "No permission to view voucher detail page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              )
+            else ...[
             _ExpandableStatusBanner(
               label: 'Paid',
               details: _paidBannerText(),
@@ -644,7 +726,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 ],
                               ),
                               const SizedBox(height: 10),
-                                  _ApprovalInfoCard(
+                              _ApprovalInfoCard(
                                 account: reqHdr?.cAccountName.isNotEmpty == true
                                     ? reqHdr!.cAccountName
                                     : request.cAccountName,
@@ -654,18 +736,44 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 section: reqHdr?.cSectionName.isNotEmpty == true
                                     ? reqHdr!.cSectionName
                                     : request.cSectionName,
+                                titleFontWeight: FontWeight.w600,
                               ),
                               const SizedBox(height: 10),
-                              Text(
-                                'Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Requested Amount',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          ' : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                                    ),
+                                  ],
+                                ),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF222222),
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                'TDS : ${_money(tdsPercent)} %',
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'TDS',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: ' : ${_money(tdsPercent)} %',
+                                    ),
+                                  ],
+                                ),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF222222),
@@ -676,12 +784,15 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 'Tax Details',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.black,
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              _ApprovalTaxTable(taxes: taxes),
+                              _ApprovalTaxTable(
+                                taxes: taxes,
+                                headerFontWeight: FontWeight.w700,
+                              ),
                               const SizedBox(height: 8),
                               Text.rich(
                                 TextSpan(
@@ -690,7 +801,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                       text: 'Comments ',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                        fontWeight: FontWeight.w600,
                                         color: Colors.black,
                                       ),
                                     ),
@@ -710,7 +821,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                                 'Uploaded Files',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.black,
                                 ),
                               ),
@@ -747,13 +858,15 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                         bankName: payDtl?.cBankName ?? '',
                         upiRefNo: payDtl?.cUPIRefNo ?? '',
                         upiApp: payDtl?.cUpiApp ?? '',
-                        onEditTap: detail == null
+                        onEditTap: !_canEditVoucher || detail == null
                             ? null
                             : () => _openEditPage(detail!),
-                        onDeleteTap: _showDeleteDialog,
-                        onPrintPdfTap: _isPrintingPdf ? null : _printVoucherPdf,
+                        onDeleteTap: _canDeleteVoucher ? _showDeleteDialog : null,
+                        onPrintPdfTap:
+                            !_canPrintVoucher || _isPrintingPdf ? null : _printVoucherPdf,
                         onViewPdfTap: _openVoucherPdf,
-                        onSharePdfTap: _isSharingPdf ? null : _shareVoucherPdf,
+                        onSharePdfTap:
+                            !_canShareVoucher || _isSharingPdf ? null : _shareVoucherPdf,
                         bottomPadding: bottomInset,
                       ),
                     ],
@@ -761,6 +874,7 @@ class _VoucherViewPageState extends State<VoucherViewPage> {
                 },
               ),
             ),
+            ],
           ],
         ),
       ),
@@ -805,6 +919,22 @@ class _VoucherViewSummaryBar extends StatelessWidget {
     required this.bottomPadding,
   });
 
+  String _formattedChequeDate() {
+    final raw = chequeDate.trim();
+    if (raw.isEmpty) return "-";
+
+    DateTime? parsed = DateTime.tryParse(raw);
+    if (parsed == null && raw.length >= 10) {
+      parsed = DateTime.tryParse(raw.substring(0, 10));
+    }
+    if (parsed == null) return raw;
+
+    final day = parsed.day.toString().padLeft(2, "0");
+    final month = parsed.month.toString().padLeft(2, "0");
+    final year = (parsed.year % 100).toString().padLeft(2, "0");
+    return "$day/$month/$year";
+  }
+
   List<Widget> _payModeInfo() {
     final mode = payMode.trim().toLowerCase();
     final rows = <Widget>[
@@ -836,7 +966,7 @@ class _VoucherViewSummaryBar extends StatelessWidget {
       rows.add(const SizedBox(height: 3));
       rows.add(
         Text(
-          'Date : ${chequeDate.isEmpty ? '-' : chequeDate}',
+          'Date : ${_formattedChequeDate()}',
           style: const TextStyle(fontSize: 12, color: Color(0xFF333333)),
         ),
       );
@@ -910,49 +1040,82 @@ class _VoucherViewSummaryBar extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GestureDetector(
-                onTap: onPrintPdfTap,
-                child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/print_icon.png',
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onViewPdfTap,
-                child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/watch_icon.png',
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onSharePdfTap,
-                child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/share_icon.png',
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onEditTap,
-                child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/edit_voucher.png',
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onDeleteTap,
-                child: const _VoucherActionIcon(
-                  assetPath: 'assets/icons/delete_voucher.png',
-                  backgroundColor: Color(0xFFFF4545),
-                  borderColor: Color(0xFFFF4545),
-                  iconColor: Colors.white,
-                ),
-              ),
-            ],
+            children: _buildActionButtons(),
           ),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildActionButtons() {
+    final buttons = <Widget>[];
+
+    void addButton(Widget button) {
+      if (buttons.isNotEmpty) {
+        buttons.add(const SizedBox(width: 10));
+      }
+      buttons.add(button);
+    }
+
+    if (onPrintPdfTap != null) {
+      addButton(
+        GestureDetector(
+          onTap: onPrintPdfTap,
+          child: const _VoucherActionIcon(
+            assetPath: 'assets/icons/print_icon.png',
+          ),
+        ),
+      );
+    }
+
+    if (onViewPdfTap != null) {
+      addButton(
+        GestureDetector(
+          onTap: onViewPdfTap,
+          child: const _VoucherActionIcon(
+            assetPath: 'assets/icons/watch_icon.png',
+          ),
+        ),
+      );
+    }
+
+    if (onSharePdfTap != null) {
+      addButton(
+        GestureDetector(
+          onTap: onSharePdfTap,
+          child: const _VoucherActionIcon(
+            assetPath: 'assets/icons/share_icon.png',
+          ),
+        ),
+      );
+    }
+
+    if (onEditTap != null) {
+      addButton(
+        GestureDetector(
+          onTap: onEditTap,
+          child: const _VoucherActionIcon(
+            assetPath: 'assets/icons/edit_voucher.png',
+          ),
+        ),
+      );
+    }
+
+    if (onDeleteTap != null) {
+      addButton(
+        GestureDetector(
+          onTap: onDeleteTap,
+          child: const _VoucherActionIcon(
+            assetPath: 'assets/icons/delete_voucher.png',
+            backgroundColor: Color(0xFFFF4545),
+            borderColor: Color(0xFFFF4545),
+            iconColor: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    return buttons;
   }
 }
 

@@ -7,6 +7,8 @@ class AppTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final String? errorText;
   final ValueChanged<String>? onChanged;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -16,6 +18,8 @@ class AppTextField extends StatelessWidget {
     this.suffixIcon,
     this.errorText,
     this.onChanged,
+    this.maxLength,
+    this.inputFormatters,
   });
 
   @override
@@ -36,11 +40,14 @@ class AppTextField extends StatelessWidget {
           controller: controller,
           onChanged: onChanged,
           obscureText: obscureText,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 14,
             ),
+            counterText: maxLength == null ? null : "",
             suffixIcon: suffixIcon,
             errorText: errorText,
             border: OutlineInputBorder(

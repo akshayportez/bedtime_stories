@@ -11,32 +11,19 @@ class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
   int _approvalPendingCount = 0;
   int _voucherPendingCount = 0;
+  bool _accessRightsLoaded = false;
+  bool _canViewPaymentRequestPage = false;
+  bool _canAddPaymentRequest = false;
+  bool _canViewPaymentApprovalPage = false;
+  bool _canAddPaymentApproval = false;
+  bool _canViewPaymentVoucherPage = false;
+  bool _canAddPaymentVoucher = false;
+  bool _canViewReportsPage = false;
+  final Set<int> _initializedTabs = <int>{};
 
   final List<String> tabs = ["Request", "Approval", "Voucher", "Reports"];
 
-  int _resolveInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    return int.tryParse(value?.toString() ?? "") ?? fallback;
-  }
-
   Future<void> _reloadApprovalList() async {
-    final projectId = await BedtimeLocalStorage.getSelectedProjectId();
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userActionId = _resolveInt(userData["userId"]);
-
-    if (!mounted) return;
-    context.read<BedtimePaymentRequestBloc>().add(
-      BedtimePaymentRequestLoadRequested(
-        companyId: 1,
-        projectId: projectId,
-        userActionId: userActionId,
-        search: "",
-        statusFilter: "",
-        dFrom: "",
-        dTo: "",
-      ),
-    );
-
     await _loadApprovalPendingCount();
   }
 
@@ -44,7 +31,75 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadVoucherPendingCount();
   }
 
+  void _showNoRightsMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _loadAccessRights() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewPaymentRequestPage = permissionSet.contains("paymentrequest");
+    final canAddPaymentRequest = permissionSet.contains(
+      "transaction-paymentrequest-add",
+    );
+    final canViewPaymentApprovalPage = permissionSet.contains("paymentapproval");
+    final canAddPaymentApproval = permissionSet.contains(
+      "transaction-paymentapproval-add",
+    );
+    final canViewPaymentVoucherPage = permissionSet.contains("paymentvoucher");
+    final canAddPaymentVoucher = permissionSet.contains(
+      "transaction-paymentvoucher-add",
+    );
+    final canViewReportsPage = permissionSet.contains("reports");
+    if (!mounted) return;
+
+    final pageAccess = [
+      canViewPaymentRequestPage,
+      canViewPaymentApprovalPage,
+      canViewPaymentVoucherPage,
+      canViewReportsPage,
+    ];
+    var nextIndex = selectedIndex;
+    if (nextIndex < 0 || nextIndex >= pageAccess.length || !pageAccess[nextIndex]) {
+      nextIndex = pageAccess.indexWhere((canView) => canView);
+      if (nextIndex == -1) {
+        nextIndex = 0;
+      }
+    }
+
+    setState(() {
+      _accessRightsLoaded = true;
+      _canViewPaymentRequestPage = canViewPaymentRequestPage;
+      _canAddPaymentRequest = canAddPaymentRequest;
+      _canViewPaymentApprovalPage = canViewPaymentApprovalPage;
+      _canAddPaymentApproval = canAddPaymentApproval;
+      _canViewPaymentVoucherPage = canViewPaymentVoucherPage;
+      _canAddPaymentVoucher = canAddPaymentVoucher;
+      _canViewReportsPage = canViewReportsPage;
+      selectedIndex = nextIndex;
+      _initializedTabs.add(nextIndex);
+    });
+
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 350), () async {
+        if (!mounted) return;
+        await _loadApprovalPendingCount();
+        await _loadVoucherPendingCount();
+      }),
+    );
+  }
+
   Future<void> _loadApprovalPendingCount() async {
+    if (!_canViewPaymentApprovalPage) {
+      if (!mounted) return;
+      setState(() {
+        _approvalPendingCount = 0;
+      });
+      return;
+    }
+
     try {
       final repository = context.read<BedtimePaymentRequestBloc>().repository;
       final projectId = await BedtimeLocalStorage.getSelectedProjectId();
@@ -78,6 +133,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadVoucherPendingCount() async {
+    if (!_canViewPaymentVoucherPage) {
+      if (!mounted) return;
+      setState(() {
+        _voucherPendingCount = 0;
+      });
+      return;
+    }
+
     try {
       final repository = context.read<BedtimePaymentRequestBloc>().repository;
       final projectId = await BedtimeLocalStorage.getSelectedProjectId();
@@ -157,8 +220,10 @@ class _HomeScreenState extends State<HomeScreen> {
     BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
       _handleSelectedProjectChanged,
     );
-    _loadApprovalPendingCount();
-    _loadVoucherPendingCount();
+    BedtimeLocalStorage.paymentDataChangeNotifier.addListener(
+      _handlePaymentDataChanged,
+    );
+    _loadAccessRights();
   }
 
   @override
@@ -166,12 +231,52 @@ class _HomeScreenState extends State<HomeScreen> {
     BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
       _handleSelectedProjectChanged,
     );
+    BedtimeLocalStorage.paymentDataChangeNotifier.removeListener(
+      _handlePaymentDataChanged,
+    );
     super.dispose();
   }
 
   void _handleSelectedProjectChanged() {
+    if (!_accessRightsLoaded) return;
     unawaited(_loadApprovalPendingCount());
     unawaited(_loadVoucherPendingCount());
+  }
+
+  void _handlePaymentDataChanged() {
+    if (!_accessRightsLoaded) return;
+    unawaited(_loadApprovalPendingCount());
+    unawaited(_loadVoucherPendingCount());
+  }
+
+  Widget _buildTabPage(int index) {
+    switch (index) {
+      case 0:
+        return _canViewPaymentRequestPage
+            ? const RequestPage()
+            : const _NoRightsPage(
+                message: "No permission to view request page",
+              );
+      case 1:
+        return _canViewPaymentApprovalPage
+            ? const ApprovalPage()
+            : const _NoRightsPage(
+                message: "No permission to view approval page",
+              );
+      case 2:
+        return _canViewPaymentVoucherPage
+            ? const VoucherPage()
+            : const _NoRightsPage(
+                message: "No permission to view voucher page",
+              );
+      case 3:
+      default:
+        return _canViewReportsPage
+            ? const ReportsPage()
+            : const _NoRightsPage(
+                message: "No permission to view reports page",
+              );
+    }
   }
 
   @override
@@ -181,44 +286,79 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
 
       /// Body Pages
-      body: IndexedStack(
-        index: selectedIndex,
-        children: const [
-          RequestPage(),
-          ApprovalPage(),
-          VoucherPage(),
-          ReportsPage(),
-        ],
-      ),
+      body: !_accessRightsLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : IndexedStack(
+              index: selectedIndex,
+              children: List<Widget>.generate(4, (index) {
+                if (!_initializedTabs.contains(index)) {
+                  return const SizedBox.shrink();
+                }
+                return _buildTabPage(index);
+              }),
+            ),
 
       /// Floating Action Button
-      floatingActionButton: selectedIndex == 3
+      floatingActionButton: !_accessRightsLoaded ||
+              selectedIndex == 3 ||
+              (selectedIndex == 0 && !_canAddPaymentRequest) ||
+              (selectedIndex == 1 && !_canAddPaymentApproval) ||
+              (selectedIndex == 2 && !_canAddPaymentVoucher)
           ? null
           : FloatingActionButton(
               backgroundColor: appPrimaryColor,
               shape: const CircleBorder(),
               onPressed: () async {
                 if (selectedIndex == 1) {
-                  await Navigator.push(
+                  if (!_canAddPaymentApproval) {
+                    _showNoRightsMessage("No permission to add payment approval");
+                    return;
+                  }
+                  final changed = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const ApprovalRequestedPage(),
                     ),
                   );
+                  if (changed == true) {
+                    BedtimeLocalStorage.notifyPaymentDataChanged();
+                  }
                   await _reloadApprovalList();
+                  await _reloadVoucherList();
                   return;
                 }
                 if (selectedIndex == 2) {
-                  await Navigator.push(
+                  if (!_canAddPaymentVoucher) {
+                    _showNoRightsMessage("No permission to add payment voucher");
+                    return;
+                  }
+                  final changed = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const VoucherApprovalRequestsPage(),
                     ),
                   );
+                  if (changed == true) {
+                    BedtimeLocalStorage.notifyPaymentDataChanged();
+                  }
                   await _reloadVoucherList();
+                  await _reloadApprovalList();
                   return;
                 }
-                Navigator.pushNamed(context, "/createRequestPage");
+                if (selectedIndex == 0 && !_canAddPaymentRequest) {
+                  _showNoRightsMessage("No permission to add payment request");
+                  return;
+                }
+                final created = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CreateRequestPage(),
+                  ),
+                );
+                if (created == true) {
+                  BedtimeLocalStorage.notifyPaymentDataChanged();
+                }
+                await _reloadApprovalList();
               },
               child: _buildFabIcon(),
             ),
@@ -235,10 +375,54 @@ class _HomeScreenState extends State<HomeScreen> {
           showApprovalDot: selectedIndex != 1 && _approvalPendingCount > 0,
           showVoucherDot: selectedIndex != 2 && _voucherPendingCount > 0,
           onChanged: (index) {
-            setState(() => selectedIndex = index);
-            _loadApprovalPendingCount();
-            _loadVoucherPendingCount();
+            if (!_accessRightsLoaded) return;
+            if (index == 0 && !_canViewPaymentRequestPage) {
+              _showNoRightsMessage("No permission to view request page");
+              return;
+            }
+            if (index == 1 && !_canViewPaymentApprovalPage) {
+              _showNoRightsMessage("No permission to view approval page");
+              return;
+            }
+            if (index == 2 && !_canViewPaymentVoucherPage) {
+              _showNoRightsMessage("No permission to view voucher page");
+              return;
+            }
+            if (index == 3 && !_canViewReportsPage) {
+              _showNoRightsMessage("No permission to view reports page");
+              return;
+            }
+            setState(() {
+              selectedIndex = index;
+              _initializedTabs.add(index);
+            });
+            if (index == 1) {
+              unawaited(_loadApprovalPendingCount());
+            } else if (index == 2) {
+              unawaited(_loadVoucherPendingCount());
+            }
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _NoRightsPage extends StatelessWidget {
+  final String message;
+
+  const _NoRightsPage({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF5F5F5F),
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

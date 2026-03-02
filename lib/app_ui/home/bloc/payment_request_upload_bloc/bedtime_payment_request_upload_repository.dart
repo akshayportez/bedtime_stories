@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:bedtime_stories/app_ui/home/model/bedtime_payment_request_upload_response.dart';
+import 'package:bedtime_stories/core/api/bedtime_api_constants.dart';
 import 'package:dio/dio.dart';
 import 'bedtime_payment_request_upload_api_provider.dart';
 
@@ -15,6 +18,11 @@ class BedtimePaymentRequestUploadRepository {
     ProgressCallback? onSendProgress,
   }) async {
     try {
+      final fileSizeBytes = await File(filePath).length();
+      if (fileSizeBytes > BedtimeApiConstants.attachmentUploadMaxBytes) {
+        throw Exception("File size must be 5 MB or less");
+      }
+
       final response = await apiProvider.uploadAttachment(
         companyId: companyId,
         projectId: projectId,

@@ -8,6 +8,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const int _usernameMaxLength = 50;
+  static const int _passwordMaxLength = 128;
+
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -92,6 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         AppTextField(
                           label: "User Name",
                           controller: usernameController,
+                          maxLength: _usernameMaxLength,
                           errorText: usernameError,
                           onChanged: (value) {
                             if (usernameError == null) return;
@@ -109,6 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         AppTextField(
                           label: "Password",
                           controller: passwordController,
+                          maxLength: _passwordMaxLength,
                           errorText: passwordError,
                           onChanged: (value) {
                             if (passwordError == null) return;

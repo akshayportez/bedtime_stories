@@ -178,6 +178,7 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
               ).then((_) {
                 _isResultDialogVisible = false;
                 if (!mounted) return;
+                BedtimeLocalStorage.notifyPaymentDataChanged();
                 Navigator.pop(context, true);
               });
             }
@@ -214,6 +215,7 @@ class _RejectApprovePageState extends State<RejectApprovePage> {
               ).then((_) {
                 _isResultDialogVisible = false;
                 if (!mounted) return;
+                BedtimeLocalStorage.notifyPaymentDataChanged();
                 Navigator.pop(context, true);
               });
             }

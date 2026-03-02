@@ -17,6 +17,9 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   bool _showApprovedDetails = false;
   bool _showRejectedDetails = false;
   bool _showPaidDetails = false;
+  bool _permissionsLoaded = false;
+  bool _canViewApprovalDetail = false;
+  bool _canEditApproval = false;
 
   String get _status => widget.request.cStatus.trim().toLowerCase();
   bool get _isApproved => _status == "approved";
@@ -24,14 +27,31 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   bool get _isPaid => _status == "paid";
 
   String _money(double value) => value.toStringAsFixed(2);
-  int _resolveInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    return int.tryParse(value?.toString() ?? "") ?? fallback;
-  }
 
   @override
   void initState() {
     super.initState();
+    _loadPermissionsAndData();
+  }
+
+  Future<void> _loadPermissionsAndData() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewApprovalDetail = permissionSet.contains(
+      "transaction-paymentapproval-view",
+    );
+    final canEditApproval = permissionSet.contains(
+      "transaction-paymentapproval-edit",
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _canViewApprovalDetail = canViewApprovalDetail;
+      _canEditApproval = canEditApproval;
+      _permissionsLoaded = true;
+    });
+
+    if (!canViewApprovalDetail) return;
+
     context.read<BedtimePaymentRequestDetailBloc>().add(
       BedtimePaymentRequestDetailLoadRequested(
         companyId: 1,
@@ -140,8 +160,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
 
   Future<void> _onApproveTapped() async {
     if (_isApproving || _isRejecting) return;
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userActionId = _resolveInt(userData["userId"]);
+    final userActionId = await BedtimeLocalStorage.getUserId() ?? 0;
     if (!mounted) return;
     context.read<BedtimeRequestApproveBloc>().add(
       BedtimeRequestApproveRequested(
@@ -155,8 +174,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
 
   Future<void> _onRejectTapped() async {
     if (_isApproving || _isRejecting) return;
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userActionId = _resolveInt(userData["userId"]);
+    final userActionId = await BedtimeLocalStorage.getUserId() ?? 0;
     if (!mounted) return;
     context.read<BedtimeRequestRejectBloc>().add(
       BedtimeRequestRejectRequested(
@@ -172,6 +190,8 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
   Widget build(BuildContext context) {
     final request = widget.request;
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final canShowEditAction = !_isPaid && _canEditApproval;
+    final canShowActionButtons = canShowEditAction && _showActionButtons;
 
     return MultiBlocListener(
       listeners: [
@@ -203,6 +223,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
               ).then((_) {
                 _isResultDialogVisible = false;
                 if (!mounted) return;
+                BedtimeLocalStorage.notifyPaymentDataChanged();
                 Navigator.pop(context, true);
               });
             }
@@ -236,6 +257,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
               ).then((_) {
                 _isResultDialogVisible = false;
                 if (!mounted) return;
+                BedtimeLocalStorage.notifyPaymentDataChanged();
                 Navigator.pop(context, true);
               });
             }
@@ -251,6 +273,23 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                 title: 'Request',
                 onBack: () => Navigator.pop(context),
               ),
+              if (!_permissionsLoaded)
+                const Expanded(child: Center(child: CircularProgressIndicator()))
+              else if (!_canViewApprovalDetail)
+                const Expanded(
+                  child: Center(
+                    child: Text(
+                      "No permission to view approval detail page",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF5F5F5F),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
               if (_isApproved)
                 _ExpandableStatusBanner(
                   label: 'Approved',
@@ -401,18 +440,44 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                                     account: request.cAccountName,
                                     category: request.cCategoryName,
                                     section: request.cSectionName,
+                                    titleFontWeight: FontWeight.w600,
                                   ),
                                   const SizedBox(height: 10),
-                                  Text(
-                                    'Requested Amount : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'Requested Amount',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              ' : ${String.fromCharCode(8377)}${_money(requestedAmount)}',
+                                        ),
+                                      ],
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFF222222),
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    'TDS : ${_money(tdsPercent)} %',
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'TDS',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: ' : ${_money(tdsPercent)} %',
+                                        ),
+                                      ],
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFF222222),
@@ -423,12 +488,15 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                                     'Tax Details',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                       color: Colors.black,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  _ApprovalTaxTable(taxes: taxes),
+                                  _ApprovalTaxTable(
+                                    taxes: taxes,
+                                    headerFontWeight: FontWeight.w700,
+                                  ),
                                   const SizedBox(height: 8),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,7 +505,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                                         'Comment :',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w600,
                                           color: Colors.black,
                                         ),
                                       ),
@@ -459,7 +527,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                                     'Uploaded Files',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                       color: Colors.black,
                                     ),
                                   ),
@@ -491,11 +559,12 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                               tax: _money(taxAmount),
                               payable: _money(payableAmount),
                               bottomPadding: bottomInset,
-                              showActionButtons: !_isPaid && _showActionButtons,
-                              showEditButton: !_isPaid,
+                              showActionButtons: canShowActionButtons,
+                              showEditButton: canShowEditAction,
                               isApproving: _isApproving,
                               isRejecting: _isRejecting,
                               onEditTap: () {
+                                if (!_canEditApproval) return;
                                 setState(() => _showActionButtons = true);
                               },
                               onRejectTap: _onRejectTapped,
@@ -506,6 +575,7 @@ class _ApprovalDetailPageState extends State<ApprovalDetailPage> {
                     },
                     ),
               ),
+              ],
             ],
           ),
         ),
@@ -518,11 +588,13 @@ class _ApprovalInfoCard extends StatelessWidget {
   final String account;
   final String category;
   final String section;
+  final FontWeight titleFontWeight;
 
   const _ApprovalInfoCard({
     required this.account,
     required this.category,
     required this.section,
+    this.titleFontWeight = FontWeight.w500,
   });
 
   @override
@@ -540,18 +612,21 @@ class _ApprovalInfoCard extends StatelessWidget {
             icon: Icons.account_balance_wallet_outlined,
             title: 'Account',
             value: account,
+            titleFontWeight: titleFontWeight,
           ),
           const SizedBox(height: 6),
           _ApprovalInfoRow(
             icon: Icons.category_outlined,
             title: 'Category',
             value: category,
+            titleFontWeight: titleFontWeight,
           ),
           const SizedBox(height: 6),
           _ApprovalInfoRow(
             icon: Icons.receipt_long_outlined,
             title: 'Section',
             value: section,
+            titleFontWeight: titleFontWeight,
           ),
         ],
       ),
@@ -563,11 +638,13 @@ class _ApprovalInfoRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
+  final FontWeight titleFontWeight;
 
   const _ApprovalInfoRow({
     required this.icon,
     required this.title,
     required this.value,
+    this.titleFontWeight = FontWeight.w500,
   });
 
   @override
@@ -591,9 +668,9 @@ class _ApprovalInfoRow extends StatelessWidget {
               children: [
                 TextSpan(
                   text: '$title : ',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: titleFontWeight,
                     color: Color(0xFF232323),
                   ),
                 ),
@@ -618,8 +695,12 @@ class _ApprovalInfoRow extends StatelessWidget {
 
 class _ApprovalTaxTable extends StatelessWidget {
   final List<BedtimePaymentRequestTax> taxes;
+  final FontWeight headerFontWeight;
 
-  const _ApprovalTaxTable({required this.taxes});
+  const _ApprovalTaxTable({
+    required this.taxes,
+    this.headerFontWeight = FontWeight.w600,
+  });
 
   static const Color _lineColor = Color(0xFF98D5F9);
   static const Color _headerColor = Color(0xFFA9CFE6);
@@ -635,7 +716,7 @@ class _ApprovalTaxTable extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: isHeader ? 13 : 14,
-          fontWeight: isHeader ? FontWeight.w600 : FontWeight.w400,
+          fontWeight: isHeader ? headerFontWeight : FontWeight.w400,
           color: isHeader ? const Color(0xFF1E1E1E) : const Color(0xFF666666),
         ),
       ),

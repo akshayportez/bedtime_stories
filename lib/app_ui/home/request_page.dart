@@ -9,8 +9,12 @@ class RequestPage extends StatefulWidget {
 
 class _RequestPageState extends State<RequestPage> {
   final TextEditingController _searchController = TextEditingController();
+  late final BedtimePaymentRequestBloc _requestBloc;
   int _projectId = 0;
   int? _userActionId;
+  bool _permissionsLoaded = false;
+  bool _canViewRequestPage = false;
+  bool _canViewRequestDetailPage = false;
   String _statusFilter = "";
   String _dFrom = "";
   String _dTo = "";
@@ -18,10 +22,16 @@ class _RequestPageState extends State<RequestPage> {
   @override
   void initState() {
     super.initState();
+    _requestBloc = BedtimePaymentRequestBloc(
+      context.read<BedtimePaymentRequestBloc>().repository,
+    );
     BedtimeLocalStorage.selectedProjectChangeNotifier.addListener(
       _handleSelectedProjectChanged,
     );
-    _loadRequests();
+    BedtimeLocalStorage.paymentDataChangeNotifier.addListener(
+      _handlePaymentDataChanged,
+    );
+    _initializePage();
   }
 
   @override
@@ -29,19 +39,41 @@ class _RequestPageState extends State<RequestPage> {
     BedtimeLocalStorage.selectedProjectChangeNotifier.removeListener(
       _handleSelectedProjectChanged,
     );
+    BedtimeLocalStorage.paymentDataChangeNotifier.removeListener(
+      _handlePaymentDataChanged,
+    );
+    _requestBloc.close();
     _searchController.dispose();
     super.dispose();
   }
 
   void _handleSelectedProjectChanged() {
-    unawaited(_syncProjectIdFromStorage());
+    if (!_canViewRequestPage) return;
+    unawaited(_loadRequests());
   }
 
-  Future<void> _syncProjectIdFromStorage() async {
-    _projectId = await BedtimeLocalStorage.getSelectedProjectId();
+  void _handlePaymentDataChanged() {
+    if (!_canViewRequestPage) return;
+    unawaited(_loadRequests());
+  }
+
+  Future<void> _initializePage() async {
+    final permissionSet = await BedtimeLocalStorage.getMenuPermissionSet();
+    final canViewRequestPage = permissionSet.contains("paymentrequest");
+    final canViewRequestDetailPage =
+        permissionSet.contains("transaction-paymentrequest-view");
+    if (!mounted) return;
+    setState(() {
+      _canViewRequestPage = canViewRequestPage;
+      _canViewRequestDetailPage = canViewRequestDetailPage;
+      _permissionsLoaded = true;
+    });
+    if (!canViewRequestPage) return;
+    await _loadRequests();
   }
 
   Future<void> _loadRequests() async {
+    if (!_canViewRequestPage) return;
     final projectId = await BedtimeLocalStorage.getSelectedProjectId();
     final userIdValue = await _getStoredUserId();
     _projectId = projectId;
@@ -50,7 +82,7 @@ class _RequestPageState extends State<RequestPage> {
     if (!mounted) return;
     if (_userActionId == null) return;
 
-    context.read<BedtimePaymentRequestBloc>().add(
+    _requestBloc.add(
           BedtimePaymentRequestLoadRequested(
             companyId: 1,
             projectId: projectId,
@@ -64,12 +96,7 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   Future<int?> _getStoredUserId() async {
-    final userData = await BedtimeLocalStorage.getUserData();
-    final userIdValue = userData["userId"];
-    final resolved = userIdValue is int
-        ? userIdValue
-        : int.tryParse(userIdValue?.toString() ?? "") ?? 0;
-    return resolved > 0 ? resolved : null;
+    return BedtimeLocalStorage.getUserId();
   }
 
   Future<void> _openProjectSelectionSheet() async {
@@ -90,12 +117,13 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _onSearchChanged(String value) {
+    if (!_canViewRequestPage) return;
     if (_userActionId == null) {
       _getStoredUserId().then((resolvedUserId) {
         if (!mounted) return;
         if (resolvedUserId == null) return;
         _userActionId = resolvedUserId;
-        context.read<BedtimePaymentRequestBloc>().add(
+        _requestBloc.add(
               BedtimePaymentRequestSearchRequested(
                 companyId: 1,
                 projectId: _projectId,
@@ -113,7 +141,7 @@ class _RequestPageState extends State<RequestPage> {
     final resolvedUserId = _userActionId;
     if (resolvedUserId == null) return;
 
-    context.read<BedtimePaymentRequestBloc>().add(
+    _requestBloc.add(
           BedtimePaymentRequestSearchRequested(
             companyId: 1,
             projectId: _projectId,
@@ -155,6 +183,7 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   Future<void> _openFilterSheet() async {
+    if (!_canViewRequestPage) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -187,7 +216,21 @@ class _RequestPageState extends State<RequestPage> {
       appBar: BedtimeGradientAppBar(
         onProjectTap: _openProjectSelectionSheet,
       ),
-      body: Padding(
+      body: !_permissionsLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : !_canViewRequestPage
+              ? const Center(
+                  child: Text(
+                    "No permission to view request page",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F5F5F),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              : Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,6 +290,7 @@ class _RequestPageState extends State<RequestPage> {
             Expanded(
               child: BlocBuilder<BedtimePaymentRequestBloc,
                   BedtimePaymentRequestState>(
+                bloc: _requestBloc,
                 builder: (context, state) {
                   if (state is BedtimePaymentRequestLoading) {
                     return const Center(child: CircularProgressIndicator());
@@ -272,6 +316,17 @@ class _RequestPageState extends State<RequestPage> {
                         final request = state.requests[index];
                         return GestureDetector(
                           onTap: () async {
+                            if (!_canViewRequestDetailPage) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "No rights to view request detail page",
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
                             final action = await Navigator.push<Object?>(
                               context,
                               MaterialPageRoute(

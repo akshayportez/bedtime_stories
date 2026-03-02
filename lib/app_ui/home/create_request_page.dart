@@ -33,6 +33,11 @@ TextInputFormatter _percentageLimit100InputFormatter() {
       return oldValue;
     }
 
+    // Allow intermediate decimal input like "." while user is typing.
+    if (text == ".") {
+      return newValue;
+    }
+
     final parsed = double.tryParse(text);
     if (parsed == null) {
       return oldValue;
@@ -47,6 +52,24 @@ TextInputFormatter _percentageLimit100InputFormatter() {
       text: clampedText,
       selection: TextSelection.collapsed(offset: 3),
     );
+  });
+}
+
+TextInputFormatter _currencyTwoDecimalInputFormatter() {
+  return TextInputFormatter.withFunction((oldValue, newValue) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    if (!RegExp(r'^\d*\.?\d{0,2}$').hasMatch(text)) {
+      return oldValue;
+    }
+
+    // Allow intermediate decimal input like "." while user is typing.
+    if (text == ".") {
+      return newValue;
+    }
+
+    return newValue;
   });
 }
 
@@ -87,6 +110,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   String _editingStatus = "Requested";
   int _uploadCounter = 0;
   bool _isSaving = false;
+  bool _isPreparingUploadFile = false;
   bool _isSuccessDialogVisible = false;
   String? _accountInlineError;
   String? _categoryInlineError;
@@ -160,10 +184,14 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   void _onTaxRateChanged(int index, String value) {
-    final normalizedValue = _clampPercentageText(value);
+    final typedValue = value.trim();
+    final parsedValue = typedValue.isEmpty ? null : double.tryParse(typedValue);
+    final normalizedValue = parsedValue != null && parsedValue > 100
+        ? "100"
+        : typedValue;
     setState(() {
       taxList[index]["rate"] = normalizedValue;
-      if (normalizedValue != value) {
+      if (normalizedValue != typedValue) {
         _taxRateControllers[index].value = TextEditingValue(
           text: normalizedValue,
           selection: TextSelection.collapsed(offset: normalizedValue.length),
@@ -206,14 +234,21 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         return;
       }
 
-      final nextRate = _clampPercentageText(taxRates[nextAvailableTax] ?? "");
-      taxList.add({"name": nextAvailableTax, "rate": nextRate});
-      _taxRateControllers.add(TextEditingController(text: nextRate));
+      taxList.add({"name": "", "rate": ""});
+      _taxRateControllers.add(TextEditingController());
     });
   }
 
   void _removeTaxRow(int index) {
     setState(() {
+      if (taxList.length <= 1) {
+        taxList[index]["name"] = "";
+        taxList[index]["rate"] = "";
+        _taxRateControllers[index].clear();
+        _taxInlineError = null;
+        return;
+      }
+
       _taxRateControllers[index].dispose();
       _taxRateControllers.removeAt(index);
       taxList.removeAt(index);
@@ -291,30 +326,37 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     return double.tryParse(sanitized) ?? 0;
   }
 
+  double _roundCurrencyValue(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   double _parsePercentage(String value) {
     return _clampPercentageValue(_parseNumber(value));
   }
 
   String _formatCurrency(double value) => "₹${value.toStringAsFixed(2)}";
 
-  double get _requestedAmount => _parseNumber(_requestedAmountController.text);
+  double get _requestedAmount =>
+      _roundCurrencyValue(_parseNumber(_requestedAmountController.text));
 
   double get _tdsRate => _parsePercentage(_tdsRateController.text);
 
   double get _tdsAmount {
     if (!isTdsChecked) return 0;
-    return _requestedAmount * _tdsRate / 100;
+    return _roundCurrencyValue(_requestedAmount * _tdsRate / 100);
   }
 
   double get _totalTaxAmount {
     if (!isTaxableChecked) return 0;
-    return taxList.fold<double>(0, (sum, tax) {
+    final total = taxList.fold<double>(0, (sum, tax) {
       final rate = _parsePercentage(tax["rate"] ?? "");
       return sum + (_requestedAmount * rate / 100);
     });
+    return _roundCurrencyValue(total);
   }
 
-  double get _payableAmount => _requestedAmount - _tdsAmount + _totalTaxAmount;
+  double get _payableAmount =>
+      _roundCurrencyValue(_requestedAmount - _tdsAmount + _totalTaxAmount);
 
   String get _attachmentValueForSave => _uploadItems
       .where((item) => item.attachmentPath.isNotEmpty)
@@ -621,6 +663,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                   userActionId: userActionId,
                 ),
               );
+              BedtimeLocalStorage.notifyPaymentDataChanged();
               Navigator.pop(context, true);
             }
           },
@@ -717,16 +760,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                             });
                           },
                           inputFormatters: [
-                            TextInputFormatter.withFunction((
-                              oldValue,
-                              newValue,
-                            ) {
-                              final text = newValue.text;
-                              if (RegExp(r'^\d*\.?\d*$').hasMatch(text)) {
-                                return newValue;
-                              }
-                              return oldValue;
-                            }),
+                            _currencyTwoDecimalInputFormatter(),
                           ],
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -895,13 +929,6 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                   ],
                 ),
               ),
-              if (_taxInlineError != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _taxInlineError!,
-                  style: const TextStyle(fontSize: 11, color: Colors.red),
-                ),
-              ],
 
               /// Tax Table
               if (isTaxableChecked) ...[
@@ -1096,27 +1123,20 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                               children: [
                                 Center(
                                   child: GestureDetector(
-                                    onTap: taxList.length > 1
-                                        ? () => _removeTaxRow(entry.key)
-                                        : null,
+                                    onTap: () => _removeTaxRow(entry.key),
                                     child: Container(
                                       width: 22,
                                       height: 22,
                                       decoration: BoxDecoration(
-                                        color: taxList.length > 1
-                                            ? const Color(0xFFFF4040)
-                                            : const Color(0xFFE0E0E0),
+                                        color: const Color(0xFFFF4040),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Center(
-                                        child: Opacity(
-                                          opacity: taxList.length > 1 ? 1 : 0.45,
-                                          child: Image.asset(
-                                            "assets/icons/delete_icon.png",
-                                            width: 22,
-                                            height: 22,
-                                            fit: BoxFit.contain,
-                                          ),
+                                        child: Image.asset(
+                                          "assets/icons/delete_icon.png",
+                                          width: 22,
+                                          height: 22,
+                                          fit: BoxFit.contain,
                                         ),
                                       ),
                                     ),
@@ -1152,6 +1172,13 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                     ),
                   ],
                 ),
+                if (_taxInlineError != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _taxInlineError!,
+                    style: const TextStyle(fontSize: 11, color: Colors.red),
+                  ),
+                ],
               ],
 
               const SizedBox(height: 14),
@@ -1292,7 +1319,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                   }
 
                   if (state is BedtimeGetAccountsListLoaded) {
-                    final options = state.accounts
+                    final activeAccounts = state.accounts
+                        .where((account) => account.bActive)
+                        .toList();
+                    final options = activeAccounts
                         .map(
                           (account) => _SearchableDropdownOption(
                             id: account.nAccountId,
@@ -1318,7 +1348,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                         setState(() {
                           _selectedAccountId = selectedId;
                           _accountInlineError = null;
-                          for (final account in state.accounts) {
+                          for (final account in activeAccounts) {
                             if (account.nAccountId == selectedId) {
                               _applyAccountTaxAndTds(account);
                               break;
@@ -1360,13 +1390,37 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     );
   }
 
-  void _onAccountCreated(int accountId) {
+  Future<void> _onAccountCreated(int accountId) async {
     setState(() {
       _selectedAccountId = accountId;
+      _accountInlineError = null;
     });
-    context.read<BedtimeGetAccountsListBloc>().add(
+
+    final accountsBloc = context.read<BedtimeGetAccountsListBloc>();
+    accountsBloc.add(
       BedtimeGetAccountsListLoadRequested(companyId: 1),
     );
+
+    final refreshedState = await accountsBloc.stream.firstWhere(
+      (state) =>
+          state is BedtimeGetAccountsListLoaded ||
+          state is BedtimeGetAccountsListFailure,
+    );
+
+    if (!mounted || refreshedState is! BedtimeGetAccountsListLoaded) return;
+
+    BedtimeGetAccountsList? createdAccount;
+    for (final account in refreshedState.accounts) {
+      if (account.nAccountId == accountId) {
+        createdAccount = account;
+        break;
+      }
+    }
+    if (createdAccount == null) return;
+
+    setState(() {
+      _applyAccountTaxAndTds(createdAccount!);
+    });
   }
 
   /// Dropdown Style Field
@@ -1429,6 +1483,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
                   if (state is BedtimeGetCategoryListLoaded) {
                     final options = state.categories
+                        .where((category) => category.bActive)
                         .map(
                           (category) => _SearchableDropdownOption(
                             id: category.nCategoryId,
@@ -1533,6 +1588,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
                   if (state is BedtimeGetSectionListLoaded) {
                     final options = state.sections
+                        .where((section) => section.bActive)
                         .map(
                           (section) => _SearchableDropdownOption(
                             id: section.nSectionId,
@@ -1754,6 +1810,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   Future<void> _pickAndUpload(ImageSource source) async {
+    if (_isPreparingUploadFile) return;
+
     if (_selectedProjectId <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1763,45 +1821,73 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       return;
     }
 
-    final pickedFile = await _imagePicker.pickImage(
-      source: source,
-      imageQuality: 85,
-    );
-    if (pickedFile == null) return;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final uploadBloc = context.read<BedtimePaymentRequestUploadBloc>();
+    setState(() => _isPreparingUploadFile = true);
 
-    final localId =
-        "${DateTime.now().microsecondsSinceEpoch}_${_uploadCounter++}";
-    final fileName = pickedFile.name.isNotEmpty
-        ? pickedFile.name
-        : pickedFile.path.split(RegExp(r"[\\\\/]")).last;
-    final fileSizeBytes = await pickedFile.length();
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: source,
+      );
+      if (pickedFile == null || !mounted) return;
 
-    setState(() {
-      _uploadItems.add(
-        _CreateRequestUploadItem(
+      final localId =
+          "${DateTime.now().microsecondsSinceEpoch}_${_uploadCounter++}";
+      final fileName = pickedFile.name.isNotEmpty
+          ? pickedFile.name
+          : pickedFile.path.split(RegExp(r"[\\\\/]")).last;
+      final fileSizeBytes = await pickedFile.length();
+      if (fileSizeBytes > BedtimeApiConstants.attachmentUploadMaxBytes) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text("File size must be 5 MB or less")),
+        );
+        return;
+      }
+
+      setState(() {
+        _uploadItems.add(
+          _CreateRequestUploadItem(
+            localId: localId,
+            filePath: pickedFile.path,
+            fileName: fileName,
+            fileSizeBytes: fileSizeBytes,
+            progress: 0,
+            isUploading: true,
+            isUploaded: false,
+            attachmentPath: "",
+            errorMessage: "",
+          ),
+        );
+      });
+
+      uploadBloc.add(
+        BedtimePaymentRequestUploadRequested(
+          companyId: 1,
+          projectId: _selectedProjectId,
           localId: localId,
           filePath: pickedFile.path,
           fileName: fileName,
-          fileSizeBytes: fileSizeBytes,
-          progress: 0,
-          isUploading: true,
-          isUploaded: false,
-          attachmentPath: "",
-          errorMessage: "",
         ),
       );
-    });
-
-    if (!mounted) return;
-    context.read<BedtimePaymentRequestUploadBloc>().add(
-      BedtimePaymentRequestUploadRequested(
-        companyId: 1,
-        projectId: _selectedProjectId,
-        localId: localId,
-        filePath: pickedFile.path,
-        fileName: fileName,
-      ),
-    );
+    } on PlatformException catch (_) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text("Unable to read the selected file. Please try again."),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text("Something went wrong while preparing the file."),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isPreparingUploadFile = false);
+      }
+    }
   }
 
   void _updateUploadProgress(String localId, double progress) {
@@ -2083,9 +2169,27 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             ),
             const SizedBox(height: 2),
             const Text(
-              "(JPEG, PNG, format, up to 50MB)",
+              "(JPEG, PNG format, up to 5MB)",
               style: TextStyle(fontSize: 10, color: Color(0xFF6F6F6F)),
             ),
+            if (_isPreparingUploadFile) ...[
+              const SizedBox(height: 8),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    "Preparing file...",
+                    style: TextStyle(fontSize: 11, color: Color(0xFF6F6F6F)),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -2095,12 +2199,16 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                   backgroundColor: Colors.white,
                   textColor: Colors.black87,
                   borderColor: const Color(0xFF9F9F9F),
-                  onTap: () => _pickAndUpload(ImageSource.camera),
+                  onTap: _isPreparingUploadFile
+                      ? null
+                      : () => _pickAndUpload(ImageSource.camera),
                 ),
                 const SizedBox(width: 8),
                 _smallButton(
                   "Gallery",
-                  onTap: () => _pickAndUpload(ImageSource.gallery),
+                  onTap: _isPreparingUploadFile
+                      ? null
+                      : () => _pickAndUpload(ImageSource.gallery),
                 ),
               ],
             ),
@@ -2310,27 +2418,31 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   /// Small Upload Buttons
   Widget _smallButton(
     String text, {
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     Color backgroundColor = const Color(0xFF25008C),
     Color textColor = Colors.white,
     Color borderColor = const Color(0xFF25008C),
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: borderColor),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+    final isEnabled = onTap != null;
+    return Opacity(
+      opacity: isEnabled ? 1 : 0.6,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: borderColor),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
@@ -2648,9 +2760,36 @@ class AddNewAccoutnSheet extends StatefulWidget {
   State<AddNewAccoutnSheet> createState() => _AddNewAccoutnSheetState();
 }
 
+class _UpperCaseTextInputFormatter extends TextInputFormatter {
+  const _UpperCaseTextInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final upperCaseText = newValue.text.toUpperCase();
+    return newValue.copyWith(
+      text: upperCaseText,
+      selection: newValue.selection,
+      composing: TextRange.empty,
+    );
+  }
+}
+
 class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   static const double _taxHeaderHeight = 30;
   static const double _taxRowHeight = 34;
+  static const int _accountNameMinLength = 3;
+  static const int _accountNameMaxLength = 100;
+  static const int _shortNameMinLength = 2;
+  static const int _shortNameMaxLength = 20;
+  static const int _panLength = 10;
+  static const int _gstLength = 15;
+  static final RegExp _accountNamePattern = RegExp(r"^[A-Za-z0-9 ]+$");
+  static final RegExp _shortNamePattern = RegExp(r"^[A-Za-z0-9]+$");
+  static final RegExp _panPattern = RegExp(r"^[A-Z0-9]{10}$");
+  static final RegExp _gstPattern = RegExp(r"^[A-Z0-9]{15}$");
 
   final TextEditingController _accountNameController = TextEditingController();
   final TextEditingController _shortNameController = TextEditingController();
@@ -2661,6 +2800,11 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   bool _isTdsChecked = false;
   bool _isTaxableChecked = false;
   bool _isSaving = false;
+  String? _accountNameError;
+  String? _shortNameError;
+  String? _panError;
+  String? _gstError;
+  String? _taxInlineError;
   late List<Map<String, String>> _taxList;
   final List<TextEditingController> _taxRateControllers = [];
 
@@ -2674,9 +2818,9 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   void initState() {
     super.initState();
     _taxList = [
-      {"name": _defaultTaxName, "rate": _defaultTaxRate()},
+      {"name": "", "rate": ""},
     ];
-    _taxRateControllers.add(TextEditingController(text: _defaultTaxRate()));
+    _taxRateControllers.add(TextEditingController());
   }
 
   @override
@@ -2699,41 +2843,68 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
       _taxList[index]["name"] = selectedTax;
       _taxList[index]["rate"] = rate;
       _taxRateControllers[index].text = _taxList[index]["rate"] ?? "";
+      if (_taxInlineError != null && _hasValidTaxSelection()) {
+        _taxInlineError = null;
+      }
     });
   }
 
   void _onTaxRateChanged(int index, String value) {
-    final normalizedValue = _clampPercentageText(value);
+    final typedValue = value.trim();
+    final parsedValue = typedValue.isEmpty ? null : double.tryParse(typedValue);
+    final normalizedValue = parsedValue != null && parsedValue > 100
+        ? "100"
+        : typedValue;
     setState(() {
       _taxList[index]["rate"] = normalizedValue;
-      if (normalizedValue != value) {
+      if (normalizedValue != typedValue) {
         _taxRateControllers[index].value = TextEditingValue(
           text: normalizedValue,
           selection: TextSelection.collapsed(offset: normalizedValue.length),
         );
       }
+      if (_taxInlineError != null && _hasValidTaxSelection()) {
+        _taxInlineError = null;
+      }
     });
   }
 
   void _addTaxRow() {
+    if (_taxList.isNotEmpty && !_isTaxRowComplete(_taxList.last)) {
+      setState(() {
+        _taxInlineError = "Please select tax and enter tax rate";
+      });
+      return;
+    }
+
     setState(() {
-      final defaultTax = _defaultTaxName;
-      final defaultRate = _defaultTaxRate();
+      _taxInlineError = null;
       _taxList.add({
-        "name": defaultTax,
-        "rate": defaultRate,
+        "name": "",
+        "rate": "",
       });
       _taxRateControllers.add(
-        TextEditingController(text: defaultRate),
+        TextEditingController(),
       );
     });
   }
 
   void _removeTaxRow(int index) {
     setState(() {
+      if (_taxList.length <= 1) {
+        _taxList[index]["name"] = "";
+        _taxList[index]["rate"] = "";
+        _taxRateControllers[index].clear();
+        _taxInlineError = null;
+        return;
+      }
+
       _taxRateControllers[index].dispose();
       _taxRateControllers.removeAt(index);
       _taxList.removeAt(index);
+      if (_taxInlineError != null && _hasValidTaxSelection()) {
+        _taxInlineError = null;
+      }
     });
   }
 
@@ -2751,6 +2922,18 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
     return int.tryParse(value?.toString() ?? "") ?? fallback;
   }
 
+  bool _isTaxRowComplete(Map<String, String> tax) {
+    final taxName = (tax["name"] ?? "").trim();
+    final taxId = widget.taxIdByName[taxName] ?? 0;
+    final taxRate = _parsePercentage(tax["rate"] ?? "");
+    return taxId > 0 && taxRate > 0;
+  }
+
+  bool _hasValidTaxSelection() {
+    if (!_isTaxableChecked) return true;
+    return _taxList.any(_isTaxRowComplete);
+  }
+
   List<Map<String, dynamic>> _buildTaxDetails() {
     if (!_isTaxableChecked) return [];
 
@@ -2761,26 +2944,146 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
           final taxRate = _parsePercentage(tax["rate"] ?? "");
           return {"nTaxId": taxId, "cTaxName": taxName, "nTaxRate": taxRate};
         })
-        .where((tax) => (tax["nTaxId"] as int) > 0)
+        .where(
+          (tax) => (tax["nTaxId"] as int) > 0 && (tax["nTaxRate"] as double) > 0,
+        )
         .toList();
+  }
+
+  String? _validateAccountName(String value) {
+    if (value.isEmpty) return "Account name is required";
+    if (value.length < _accountNameMinLength) {
+      return "Account name must be at least $_accountNameMinLength characters";
+    }
+    if (value.length > _accountNameMaxLength) {
+      return "Account name must be at most $_accountNameMaxLength characters";
+    }
+    if (!_accountNamePattern.hasMatch(value)) {
+      return "Special characters are not allowed in account name";
+    }
+    return null;
+  }
+
+  String? _validateShortName(String value) {
+    if (value.isEmpty) return "Short name is required";
+    if (value.length < _shortNameMinLength) {
+      return "Short name must be at least $_shortNameMinLength characters";
+    }
+    if (value.length > _shortNameMaxLength) {
+      return "Short name must be at most $_shortNameMaxLength characters";
+    }
+    if (!_shortNamePattern.hasMatch(value)) {
+      return "Special characters are not allowed in short name";
+    }
+    return null;
+  }
+
+  String? _validatePan(String value) {
+    final normalized = _normalizeAlphaNumeric(value);
+    if (normalized.isEmpty) return null;
+    if (!_panPattern.hasMatch(normalized)) {
+      return "PAN must be 10 letters/numbers";
+    }
+    return null;
+  }
+
+  String? _validateGst(String value) {
+    final normalized = _normalizeAlphaNumeric(value);
+    if (normalized.isEmpty) return null;
+    if (!_gstPattern.hasMatch(normalized)) {
+      return "GST must be 15 letters/numbers";
+    }
+    return null;
+  }
+
+  String _normalizeAlphaNumeric(String value) {
+    return value.toUpperCase().replaceAll(RegExp(r"[^A-Z0-9]"), "");
+  }
+
+  void _setNormalizedControllerText(
+    TextEditingController controller,
+    String normalizedValue,
+  ) {
+    if (controller.text == normalizedValue) return;
+    controller.value = TextEditingValue(
+      text: normalizedValue,
+      selection: TextSelection.collapsed(offset: normalizedValue.length),
+    );
+  }
+
+  bool _validateInlineFields() {
+    final normalizedPan = _normalizeAlphaNumeric(_panController.text.trim());
+    final normalizedGst = _normalizeAlphaNumeric(_gstController.text.trim());
+    _setNormalizedControllerText(_panController, normalizedPan);
+    _setNormalizedControllerText(_gstController, normalizedGst);
+
+    final accountNameError = _validateAccountName(
+      _accountNameController.text.trim(),
+    );
+    final shortNameError = _validateShortName(_shortNameController.text.trim());
+    final panError = _validatePan(normalizedPan);
+    final gstError = _validateGst(normalizedGst);
+
+    setState(() {
+      _accountNameError = accountNameError;
+      _shortNameError = shortNameError;
+      _panError = panError;
+      _gstError = gstError;
+    });
+
+    return accountNameError == null &&
+        shortNameError == null &&
+        panError == null &&
+        gstError == null;
+  }
+
+  void _onAccountNameChanged(String value) {
+    if (_accountNameError == null) return;
+    setState(() {
+      _accountNameError = _validateAccountName(value.trim());
+    });
+  }
+
+  void _onShortNameChanged(String value) {
+    if (_shortNameError == null) return;
+    setState(() {
+      _shortNameError = _validateShortName(value.trim());
+    });
+  }
+
+  void _onPanChanged(String value) {
+    final normalized = _normalizeAlphaNumeric(value);
+    _setNormalizedControllerText(_panController, normalized);
+    if (_panError == null) return;
+    setState(() {
+      _panError = _validatePan(normalized);
+    });
+  }
+
+  void _onGstChanged(String value) {
+    final normalized = _normalizeAlphaNumeric(value);
+    _setNormalizedControllerText(_gstController, normalized);
+    if (_gstError == null) return;
+    setState(() {
+      _gstError = _validateGst(normalized);
+    });
   }
 
   void _saveAccount() async {
     if (_isSaving) return;
-
-    final accountName = _accountNameController.text.trim();
-    if (accountName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter account name")),
-      );
+    if (!_validateInlineFields()) {
       return;
     }
+    final accountName = _accountNameController.text.trim();
+    final shortName = _shortNameController.text.trim();
+    final panNumber = _normalizeAlphaNumeric(_panController.text.trim());
+    final gstNumber = _normalizeAlphaNumeric(_gstController.text.trim());
 
     final taxDetails = _buildTaxDetails();
     if (_isTaxableChecked && taxDetails.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select valid tax details")),
-      );
+      setState(() {
+        _taxInlineError = "Please select tax and enter tax rate";
+      });
       return;
     }
 
@@ -2795,9 +3098,9 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
         payload: {
           "nAccountId": 0,
           "cAccountName": accountName,
-          "cAccountShName": _shortNameController.text.trim(),
-          "cPAN": _panController.text.trim(),
-          "cGST": _gstController.text.trim(),
+          "cAccountShName": shortName,
+          "cPAN": panNumber,
+          "cGST": gstNumber,
           "bTDS": _isTdsChecked,
           "nTDSPercent": _isTdsChecked
               ? _parsePercentage(_tdsRateController.text)
@@ -2813,13 +3116,86 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
     );
   }
 
-  Widget _fieldLabel(String text) {
+  Future<void> _showCenteredSuccessPopup() async {
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.transparent,
+      useRootNavigator: true,
+      builder: (_) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22A447),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "Account created successfully",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 1200));
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  Widget _fieldLabel(String text, {bool isMandatory = false}) {
+    if (!isMandatory) {
+      return Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          color: Colors.black,
+          fontWeight: FontWeight.w400,
+        ),
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: text,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const TextSpan(
+            text: " *",
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFFE53935),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _inlineErrorText(String message) {
     return Text(
-      text,
+      message,
       style: const TextStyle(
-        fontSize: 13,
-        color: Colors.black,
-        fontWeight: FontWeight.w400,
+        fontSize: 11,
+        color: Color(0xFFCC2B2B),
       ),
     );
   }
@@ -2835,12 +3211,16 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
     double fontSize = 13,
     double hintFontSize = 13,
     double suffixFontSize = 15,
+    ValueChanged<String>? onChanged,
+    bool hasError = false,
   }) {
     final field = Container(
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFCCDDEB)),
+        border: Border.all(
+          color: hasError ? const Color(0xFFCC2B2B) : const Color(0xFFCCDDEB),
+        ),
         borderRadius: BorderRadius.circular(6),
         color: Colors.white,
       ),
@@ -2850,6 +3230,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
             child: TextField(
               controller: controller,
               enabled: enabled,
+              onChanged: enabled ? onChanged : null,
               keyboardType: keyboardType,
               inputFormatters: inputFormatters,
               textAlign: TextAlign.start,
@@ -2898,7 +3279,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
     return BlocListener<BedtimeAddAccountBloc, BedtimeAddAccountState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is BedtimeAddAccountSaving) {
           setState(() => _isSaving = true);
           return;
@@ -2914,14 +3295,8 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
 
         if (state is BedtimeAddAccountSaveSuccess) {
           setState(() => _isSaving = false);
-          final bottomInset = MediaQuery.of(context).padding.bottom;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.fromLTRB(14, 0, 14, 120 + bottomInset),
-              content: const Text("Account created successfully"),
-            ),
-          );
+          await _showCenteredSuccessPopup();
+          if (!mounted) return;
           widget.onAccountCreated(state.response.nAccountId);
           Navigator.pop(context);
         }
@@ -2974,27 +3349,91 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _fieldLabel("Account Name"),
+                    _fieldLabel("Account Name", isMandatory: true),
                     const SizedBox(height: 4),
-                    _textInput(controller: _accountNameController),
+                    _textInput(
+                      controller: _accountNameController,
+                      hasError: _accountNameError != null,
+                      onChanged: _onAccountNameChanged,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r"[A-Za-z0-9 ]"),
+                        ),
+                        LengthLimitingTextInputFormatter(_accountNameMaxLength),
+                      ],
+                    ),
+                    if (_accountNameError != null) ...[
+                      const SizedBox(height: 4),
+                      _inlineErrorText(_accountNameError!),
+                    ],
                     const SizedBox(height: 8),
-                    _fieldLabel("Short Name"),
+                    _fieldLabel("Short Name", isMandatory: true),
                     const SizedBox(height: 4),
-                    _textInput(controller: _shortNameController, width: 86),
+                    _textInput(
+                      controller: _shortNameController,
+                      width: 120,
+                      hasError: _shortNameError != null,
+                      onChanged: _onShortNameChanged,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r"[A-Za-z0-9]"),
+                        ),
+                        LengthLimitingTextInputFormatter(_shortNameMaxLength),
+                      ],
+                    ),
+                    if (_shortNameError != null) ...[
+                      const SizedBox(height: 4),
+                      _inlineErrorText(_shortNameError!),
+                    ],
                     const SizedBox(height: 8),
                     _fieldLabel("PAN Number"),
                     const SizedBox(height: 4),
-                    _textInput(controller: _panController),
+                    _textInput(
+                      controller: _panController,
+                      hasError: _panError != null,
+                      onChanged: _onPanChanged,
+                      inputFormatters: [
+                        const _UpperCaseTextInputFormatter(),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r"[A-Za-z0-9]"),
+                        ),
+                        LengthLimitingTextInputFormatter(_panLength),
+                      ],
+                    ),
+                    if (_panError != null) ...[
+                      const SizedBox(height: 4),
+                      _inlineErrorText(_panError!),
+                    ],
                     const SizedBox(height: 8),
                     _fieldLabel("GST Number"),
                     const SizedBox(height: 4),
-                    _textInput(controller: _gstController),
+                    _textInput(
+                      controller: _gstController,
+                      hasError: _gstError != null,
+                      onChanged: _onGstChanged,
+                      inputFormatters: [
+                        const _UpperCaseTextInputFormatter(),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r"[A-Za-z0-9]"),
+                        ),
+                        LengthLimitingTextInputFormatter(_gstLength),
+                      ],
+                    ),
+                    if (_gstError != null) ...[
+                      const SizedBox(height: 4),
+                      _inlineErrorText(_gstError!),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         GestureDetector(
                           onTap: () {
-                            setState(() => _isTdsChecked = !_isTdsChecked);
+                            setState(() {
+                              _isTdsChecked = !_isTdsChecked;
+                              if (!_isTdsChecked) {
+                                _tdsRateController.clear();
+                              }
+                            });
                           },
                           child: _CreateRequestBlueCheckBox(
                             isChecked: _isTdsChecked,
@@ -3026,19 +3465,18 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                       onTap: () {
                         setState(() {
                           _isTaxableChecked = !_isTaxableChecked;
+                          if (!_isTaxableChecked) {
+                            _taxInlineError = null;
+                          }
                           if (_isTaxableChecked && _taxList.isEmpty) {
-                            final defaultTax = _defaultTaxName;
-                            final defaultRate = _defaultTaxRate();
                             _taxList = [
                               {
-                                "name": defaultTax,
-                                "rate": defaultRate,
+                                "name": "",
+                                "rate": "",
                               },
                             ];
                             _taxRateControllers.add(
-                              TextEditingController(
-                                text: defaultRate,
-                              ),
+                              TextEditingController(),
                             );
                           }
                         });
@@ -3239,10 +3677,7 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                                   child: Row(
                                     children: [
                                       GestureDetector(
-                                        onTap: () {
-                                          if (_taxList.length <= 1) return;
-                                          _removeTaxRow(entry.key);
-                                        },
+                                        onTap: () => _removeTaxRow(entry.key),
                                         child: Container(
                                           width: 22,
                                           height: 22,
@@ -3292,6 +3727,10 @@ class _AddNewAccoutnSheetState extends State<AddNewAccoutnSheet> {
                           ),
                         ],
                       ),
+                      if (_taxInlineError != null) ...[
+                        const SizedBox(height: 6),
+                        _inlineErrorText(_taxInlineError!),
+                      ],
                     ],
                     const SizedBox(height: 18),
                     Align(
